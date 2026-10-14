@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'api.dart';
 
@@ -63,6 +63,90 @@ class StaffApp extends StatelessWidget {
       );
 }
 
+// ─── Shared logo widget (Image 2 design) ────────────────────────────────────
+
+class _AppLogo extends StatelessWidget {
+  const _AppLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(
+            color: blue,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned(
+                bottom: 8,
+                child: Icon(
+                  Icons.people_alt_rounded,
+                  color: Colors.white.withValues(alpha: 0.45),
+                  size: 36,
+                ),
+              ),
+              const Text(
+                'DR',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'Disaster Relief',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: ink,
+          ),
+        ),
+        const SizedBox(height: 3),
+        const Text(
+          'Resource Management System',
+          style: TextStyle(fontSize: 13, color: muted),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          decoration: BoxDecoration(
+            border: Border.all(color: blue),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            'STAFF',
+            style: TextStyle(
+              color: blue,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Together for a safer and stronger community.',
+          style: TextStyle(color: muted, fontSize: 12),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Login Page (Image 1 design) ────────────────────────────────────────────
+
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
   @override
@@ -70,22 +154,26 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final email = TextEditingController();
-  final password = TextEditingController();
-  bool busy = false;
-  bool hidePassword = true;
-  String? error;
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  bool _busy = false;
+  bool _hidePassword = true;
+  bool _rememberMe = false;
+  String? _error;
 
-  Future<void> login() async {
-    if (email.text.trim().isEmpty || password.text.isEmpty) {
-      setState(() => error = 'Enter your email and password.');
+  Future<void> _login() async {
+    if (_email.text.trim().isEmpty || _password.text.isEmpty) {
+      setState(() => _error = 'Enter your email and password.');
       return;
     }
-    setState(() { busy = true; error = null; });
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       final result = await Api.req('POST', '/login', auth: false, body: {
-        'email': email.text.trim(),
-        'password': password.text,
+        'email': _email.text.trim(),
+        'password': _password.text,
       });
       if (result['user']?['role'] != 'staff') {
         throw Exception('This mobile app is for staff accounts only.');
@@ -93,17 +181,482 @@ class _LoginPageState extends State<LoginPage> {
       await Api.saveToken(result['token'].toString());
       if (mounted) {
         Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => const StaffHome()));
+          context,
+          MaterialPageRoute(builder: (_) => const StaffHome()),
+        );
       }
     } catch (e) {
-      if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        setState(
+            () => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
-  void dispose() { email.dispose(); password.dispose(); super.dispose(); }
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Logo
+                    const Center(child: _AppLogo()),
+                    const SizedBox(height: 28),
+                    // Heading outside card
+                    const Text(
+                      'Disaster Relief Resource Management',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: ink,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Sign in to continue',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: muted, fontSize: 14),
+                    ),
+                    const SizedBox(height: 24),
+                    // Form card
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Email
+                            const Text(
+                              'Email',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: ink,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _email,
+                              keyboardType: TextInputType.emailAddress,
+                              onSubmitted: (_) => _busy ? null : _login(),
+                            ),
+                            const SizedBox(height: 14),
+                            // Password
+                            const Text(
+                              'Password',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: ink,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _password,
+                              obscureText: _hidePassword,
+                              onSubmitted: (_) => _busy ? null : _login(),
+                              decoration: InputDecoration(
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(
+                                      () => _hidePassword = !_hidePassword),
+                                  icon: Icon(
+                                    _hidePassword
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Remember me
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: (v) =>
+                                      setState(() => _rememberMe = v ?? false),
+                                  activeColor: blue,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'Remember me',
+                                  style: TextStyle(fontSize: 13, color: ink),
+                                ),
+                              ],
+                            ),
+                            // Error
+                            if (_error != null) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                _error!,
+                                style: const TextStyle(
+                                    color: Colors.red, fontSize: 13),
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            // Sign in button
+                            FilledButton(
+                              onPressed: _busy ? null : _login,
+                              child: _busy
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white),
+                                    )
+                                  : const Text('Sign in'),
+                            ),
+                            const SizedBox(height: 8),
+                            // Forgot password
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const ForgotPasswordPage()),
+                                ),
+                                child: const Text(
+                                  'Forgot password?',
+                                  style: TextStyle(
+                                      color: blue,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ),
+                            // Register link
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  "Don't have an account? ",
+                                  style:
+                                      TextStyle(color: muted, fontSize: 13),
+                                ),
+                                GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => const RegisterPage()),
+                                  ),
+                                  child: const Text(
+                                    'Register',
+                                    style: TextStyle(
+                                      color: blue,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Demo admin login: admin@disasterrelief.test / password',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+// ─── Register Page (Image 3 design) ─────────────────────────────────────────
+
+class RegisterPage extends StatefulWidget {
+  const RegisterPage({super.key});
+  @override
+  State<RegisterPage> createState() => _RegisterPageState();
+}
+
+class _RegisterPageState extends State<RegisterPage> {
+  final _fullName = TextEditingController();
+  final _email = TextEditingController();
+  final _phone = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  bool _busy = false;
+  bool _hidePassword = true;
+  bool _hideConfirm = true;
+  String? _error;
+
+  Future<void> _register() async {
+    if (_fullName.text.trim().isEmpty ||
+        _email.text.trim().isEmpty ||
+        _password.text.isEmpty) {
+      setState(() => _error = 'Please fill in all required fields.');
+      return;
+    }
+    if (_password.text != _confirmPassword.text) {
+      setState(() => _error = 'Passwords do not match.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await Api.req('POST', '/register', auth: false, body: {
+        'name': _fullName.text.trim(),
+        'email': _email.text.trim(),
+        'phone': _phone.text.trim(),
+        'password': _password.text,
+        'password_confirmation': _confirmPassword.text,
+        'role': 'staff',
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Account created! Please sign in.')),
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+          (_) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(
+            () => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _fullName.dispose();
+    _email.dispose();
+    _phone.dispose();
+    _password.dispose();
+    _confirmPassword.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Logo
+                    const Center(child: _AppLogo()),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Create an account',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: ink,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Join the relief coordination team',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: muted, fontSize: 14),
+                    ),
+                    const SizedBox(height: 24),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const _FieldLabel('Full name'),
+                            const SizedBox(height: 6),
+                            TextField(controller: _fullName),
+                            const SizedBox(height: 14),
+                            const _FieldLabel('Email'),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _email,
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+                            const SizedBox(height: 14),
+                            const _FieldLabel('Phone (optional)'),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _phone,
+                              keyboardType: TextInputType.phone,
+                            ),
+                            const SizedBox(height: 14),
+                            const _FieldLabel('Password'),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _password,
+                              obscureText: _hidePassword,
+                              decoration: InputDecoration(
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(
+                                      () => _hidePassword = !_hidePassword),
+                                  icon: Icon(
+                                    _hidePassword
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            const _FieldLabel('Confirm password'),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _confirmPassword,
+                              obscureText: _hideConfirm,
+                              decoration: InputDecoration(
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(
+                                      () => _hideConfirm = !_hideConfirm),
+                                  icon: Icon(
+                                    _hideConfirm
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                _error!,
+                                style: const TextStyle(
+                                    color: Colors.red, fontSize: 13),
+                              ),
+                            ],
+                            const SizedBox(height: 18),
+                            FilledButton(
+                              onPressed: _busy ? null : _register,
+                              child: _busy
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white),
+                                    )
+                                  : const Text('Create account'),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'Already have an account? ',
+                                  style: TextStyle(
+                                      color: muted, fontSize: 13),
+                                ),
+                                GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: const Text(
+                                    'Sign in',
+                                    style: TextStyle(
+                                      color: blue,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+// ─── Forgot Password Page (Image 4 design) ───────────────────────────────────
+
+class ForgotPasswordPage extends StatefulWidget {
+  const ForgotPasswordPage({super.key});
+  @override
+  State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
+}
+
+class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
+  final _email = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _sendOtp() async {
+    if (_email.text.trim().isEmpty) {
+      setState(() => _error = 'Please enter your email address.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await Api.req('POST', '/password/forgot', auth: false,
+          body: {'email': _email.text.trim()});
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VerifyOtpPage(email: _email.text.trim()),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(
+            () => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -113,36 +666,279 @@ class _LoginPageState extends State<LoginPage> {
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      width: 76, height: 76,
-                      decoration: BoxDecoration(color: blue, borderRadius: BorderRadius.circular(22)),
-                      child: const Icon(Icons.volunteer_activism, color: Colors.white, size: 40),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Recover your password',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: ink,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Verify your email before creating a new password.',
+                          style: TextStyle(color: muted, fontSize: 13),
+                        ),
+                        const SizedBox(height: 22),
+                        const _FieldLabel('Gmail address'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _email,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            hintText: 'you@gmail.com',
+                          ),
+                        ),
+                        if (_error != null) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            _error!,
+                            style: const TextStyle(
+                                color: Colors.red, fontSize: 13),
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        FilledButton(
+                          onPressed: _busy ? null : _sendOtp,
+                          child: _busy
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white),
+                                )
+                              : const Text('Send OTP'),
+                        ),
+                        const SizedBox(height: 14),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text(
+                              'Back to login',
+                              style: TextStyle(
+                                  color: blue, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                    const Text('Disaster Relief', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: ink)),
-                    const SizedBox(height: 6),
-                    const Text('Staff portal', style: TextStyle(color: muted, fontSize: 15)),
-                    const SizedBox(height: 28),
-                    Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      const Text('Welcome back', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 5),
-                      const Text('Sign in to manage relief operations.', style: TextStyle(color: muted)),
-                      const SizedBox(height: 22),
-                      TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Staff email', prefixIcon: Icon(Icons.mail_outline))),
-                      const SizedBox(height: 14),
-                      TextField(controller: password, obscureText: hidePassword, onSubmitted: (_) => busy ? null : login(), decoration: InputDecoration(labelText: 'Password', prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(onPressed: () => setState(() => hidePassword = !hidePassword), icon: Icon(hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined)))),
-                      if (error != null) ...[const SizedBox(height: 12), Text(error!, style: const TextStyle(color: Colors.red))],
-                      const SizedBox(height: 18),
-                      FilledButton(onPressed: busy ? null : login, child: busy ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Sign in')),
-                    ]))),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
+        ),
+      );
+}
+
+// ─── Verify OTP Page (Image 5 design) ────────────────────────────────────────
+
+class VerifyOtpPage extends StatefulWidget {
+  const VerifyOtpPage({super.key, required this.email});
+  final String email;
+
+  @override
+  State<VerifyOtpPage> createState() => _VerifyOtpPageState();
+}
+
+class _VerifyOtpPageState extends State<VerifyOtpPage> {
+  final _otp = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _verifyOtp() async {
+    if (_otp.text.trim().isEmpty) {
+      setState(() => _error = 'Please enter the OTP.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await Api.req('POST', '/password/verify-otp', auth: false, body: {
+        'email': widget.email,
+        'otp': _otp.text.trim(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('OTP verified. Please set a new password.')),
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+          (_) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(
+            () => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _resendOtp() async {
+    setState(() => _error = null);
+    try {
+      await Api.req('POST', '/password/forgot', auth: false,
+          body: {'email': widget.email});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('OTP resent to your email.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(
+            () => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _otp.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Recover your password',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: ink,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Verify your email before creating a new password.',
+                          style: TextStyle(color: muted, fontSize: 13),
+                        ),
+                        const SizedBox(height: 16),
+                        // Green success banner
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xffecfdf5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'A 6-digit OTP was sent to your email. It expires in 10 minutes.',
+                            style: TextStyle(
+                              color: Color(0xff059669),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        const _FieldLabel('6-digit OTP'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _otp,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          decoration: const InputDecoration(
+                            hintText: 'Enter OTP',
+                            counterText: '',
+                          ),
+                        ),
+                        if (_error != null) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            _error!,
+                            style: const TextStyle(
+                                color: Colors.red, fontSize: 13),
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        FilledButton(
+                          onPressed: _busy ? null : _verifyOtp,
+                          child: _busy
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white),
+                                )
+                              : const Text('Verify OTP'),
+                        ),
+                        const SizedBox(height: 10),
+                        Center(
+                          child: TextButton(
+                            onPressed: _resendOtp,
+                            child: const Text(
+                              'Resend OTP',
+                              style: TextStyle(
+                                  color: blue, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const LoginPage()),
+                              (_) => false,
+                            ),
+                            child: const Text(
+                              'Back to login',
+                              style: TextStyle(
+                                  color: blue, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+// ─── Shared helper ────────────────────────────────────────────────────────────
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: ink,
         ),
       );
 }
@@ -420,19 +1216,19 @@ class _StaffDashboardState extends State<StaffDashboard> {
       const SizedBox(height: 18),
       if (snap.connectionState == ConnectionState.waiting) const LinearProgressIndicator(),
       GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.42, children: [
-        _StatCard(title: 'Total Resources', value: snap.hasData ? '${resources.length}' : '—', icon: Icons.inventory_2_outlined, tint: const Color(0xffeff6ff), color: blue),
-        _StatCard(title: 'Total Stock Quantity', value: snap.hasData ? '$stock' : '—', icon: Icons.widgets_outlined, tint: const Color(0xffeef2ff), color: const Color(0xff4f46e5)),
-        _StatCard(title: 'Pending', value: snap.hasData ? '$pending' : '—', icon: Icons.schedule_rounded, tint: const Color(0xfffffbeb), color: const Color(0xffd97706)),
-        _StatCard(title: 'In Transit / Pending', value: snap.hasData ? '$pending' : '—', icon: Icons.local_shipping_outlined, tint: const Color(0xfff1f5f9), color: const Color(0xff475569)),
-        _StatCard(title: 'Completed', value: snap.hasData ? '$completed' : '—', icon: Icons.check_circle_outline, tint: const Color(0xffecfdf5), color: const Color(0xff059669)),
-        _StatCard(title: 'Families', value: snap.hasData ? '${families.length}' : '—', icon: Icons.groups_outlined, tint: const Color(0xffeff6ff), color: blue),
-        _StatCard(title: 'QR Scans Logged', value: snap.hasData ? '${scans.length}' : '—', icon: Icons.qr_code_2_rounded, tint: const Color(0xfffaf5ff), color: const Color(0xffa855f7)),
-        _StatCard(title: 'Households Served', value: snap.hasData ? '$completed' : '—', icon: Icons.volunteer_activism_outlined, tint: const Color(0xfff0fdfa), color: const Color(0xff0d9488)),
+        _StatCard(title: 'Total Resources', value: snap.hasData ? '${resources.length}' : 'â€”', icon: Icons.inventory_2_outlined, tint: const Color(0xffeff6ff), color: blue),
+        _StatCard(title: 'Total Stock Quantity', value: snap.hasData ? '$stock' : 'â€”', icon: Icons.widgets_outlined, tint: const Color(0xffeef2ff), color: const Color(0xff4f46e5)),
+        _StatCard(title: 'Pending', value: snap.hasData ? '$pending' : 'â€”', icon: Icons.schedule_rounded, tint: const Color(0xfffffbeb), color: const Color(0xffd97706)),
+        _StatCard(title: 'In Transit / Pending', value: snap.hasData ? '$pending' : 'â€”', icon: Icons.local_shipping_outlined, tint: const Color(0xfff1f5f9), color: const Color(0xff475569)),
+        _StatCard(title: 'Completed', value: snap.hasData ? '$completed' : 'â€”', icon: Icons.check_circle_outline, tint: const Color(0xffecfdf5), color: const Color(0xff059669)),
+        _StatCard(title: 'Families', value: snap.hasData ? '${families.length}' : 'â€”', icon: Icons.groups_outlined, tint: const Color(0xffeff6ff), color: blue),
+        _StatCard(title: 'QR Scans Logged', value: snap.hasData ? '${scans.length}' : 'â€”', icon: Icons.qr_code_2_rounded, tint: const Color(0xfffaf5ff), color: const Color(0xffa855f7)),
+        _StatCard(title: 'Households Served', value: snap.hasData ? '$completed' : 'â€”', icon: Icons.volunteer_activism_outlined, tint: const Color(0xfff0fdfa), color: const Color(0xff0d9488)),
       ]),
       const SizedBox(height: 22),
-      _SectionCard(title: 'Recent Distributions', action: 'Refresh', onAction: () => setState(() => future = _load()), child: distributions.isEmpty ? const _EmptyState(text: 'No distributions to show yet.') : Column(children: distributions.take(4).map((e) { final m = e as Map; return _MiniRecord(icon: Icons.local_shipping_outlined, title: '${m['family_name'] ?? m['family']?['name'] ?? 'Family distribution'}', subtitle: '${m['status'] ?? 'Status unavailable'} • ${m['distribution_date'] ?? m['scheduled_at'] ?? ''}'); }).toList())),
+      _SectionCard(title: 'Recent Distributions', action: 'Refresh', onAction: () => setState(() => future = _load()), child: distributions.isEmpty ? const _EmptyState(text: 'No distributions to show yet.') : Column(children: distributions.take(4).map((e) { final m = e as Map; return _MiniRecord(icon: Icons.local_shipping_outlined, title: '${m['family_name'] ?? m['family']?['name'] ?? 'Family distribution'}', subtitle: '${m['status'] ?? 'Status unavailable'} â€¢ ${m['distribution_date'] ?? m['scheduled_at'] ?? ''}'); }).toList())),
       const SizedBox(height: 14),
-      _SectionCard(title: 'Recent QR Scans', action: 'Refresh', onAction: () => setState(() => future = _load()), child: scans.isEmpty ? const _EmptyState(text: 'No scan records to show yet.') : Column(children: scans.take(4).map((e) { final m = e as Map; return _MiniRecord(icon: Icons.qr_code_2, title: '${m['resource']?['name'] ?? m['resource_name'] ?? 'Resource scan'}', subtitle: '${m['scan_type'] ?? 'Scan'} • ${m['scanned_at'] ?? ''}'); }).toList())),
+      _SectionCard(title: 'Recent QR Scans', action: 'Refresh', onAction: () => setState(() => future = _load()), child: scans.isEmpty ? const _EmptyState(text: 'No scan records to show yet.') : Column(children: scans.take(4).map((e) { final m = e as Map; return _MiniRecord(icon: Icons.qr_code_2, title: '${m['resource']?['name'] ?? m['resource_name'] ?? 'Resource scan'}', subtitle: '${m['scan_type'] ?? 'Scan'} â€¢ ${m['scanned_at'] ?? ''}'); }).toList())),
       const SizedBox(height: 14),
       _SectionCard(title: 'Low Stock Alerts', child: resources.where((e) { final m = e as Map; final q = m['quantity']; final min = m['min_quantity']; return q is num && min is num && q <= min; }).isEmpty ? const _EmptyState(text: 'No low-stock alerts, or stock thresholds are unavailable.') : Column(children: resources.where((e) { final m = e as Map; return m['quantity'] is num && m['min_quantity'] is num && (m['quantity'] as num) <= (m['min_quantity'] as num); }).map((e) { final m = e as Map; return _MiniRecord(icon: Icons.warning_amber_rounded, title: '${m['name'] ?? 'Resource'}', subtitle: 'Remaining stock: ${m['quantity']}'); }).toList())),
     ]));
@@ -443,7 +1239,7 @@ class _QuickAction extends StatelessWidget { final IconData icon; final String l
 class _StatCard extends StatelessWidget { final String title, value; final IconData icon; final Color tint, color; const _StatCard({required this.title, required this.value, required this.icon, required this.tint, required this.color}); @override Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(13), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Container(width: 36, height: 36, decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(11)), child: Icon(icon, color: color, size: 21)), Text(value, style: const TextStyle(fontSize: 24, height: 1.1, fontWeight: FontWeight.w800, color: ink)), Text(title, style: const TextStyle(fontSize: 11, color: muted), maxLines: 2, overflow: TextOverflow.ellipsis)]))); }
 class _SectionCard extends StatelessWidget { final String title; final String? action; final VoidCallback? onAction; final Widget child; const _SectionCard({required this.title, required this.child, this.action, this.onAction}); @override Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))), if (action != null) TextButton(onPressed: onAction, child: Text(action!))]), const SizedBox(height: 8), child]))); }
 class _EmptyState extends StatelessWidget { final String text; const _EmptyState({required this.text}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4), child: Center(child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: muted, fontSize: 13)))); }
-class _MiniRecord extends StatelessWidget { final IconData icon; final String title, subtitle; const _MiniRecord({required this.icon, required this.title, required this.subtitle}); @override Widget build(BuildContext context) => ListTile(contentPadding: EdgeInsets.zero, leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: blue, size: 20)), title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text(subtitle.trim().isEmpty ? '—' : subtitle, style: const TextStyle(fontSize: 11, color: muted), maxLines: 1, overflow: TextOverflow.ellipsis)); }
+class _MiniRecord extends StatelessWidget { final IconData icon; final String title, subtitle; const _MiniRecord({required this.icon, required this.title, required this.subtitle}); @override Widget build(BuildContext context) => ListTile(contentPadding: EdgeInsets.zero, leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: blue, size: 20)), title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text(subtitle.trim().isEmpty ? 'â€”' : subtitle, style: const TextStyle(fontSize: 11, color: muted), maxLines: 1, overflow: TextOverflow.ellipsis)); }
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -659,9 +1455,9 @@ class _ScanPageState extends State<ScanPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Stock: ${resource!['quantity'] ?? '—'} ${resource!['unit'] ?? ''}',
+                    'Stock: ${resource!['quantity'] ?? 'â€”'} ${resource!['unit'] ?? ''}',
                   ),
-                  Text('Location: ${resource!['location']?['name'] ?? '—'}'),
+                  Text('Location: ${resource!['location']?['name'] ?? 'â€”'}'),
                   const SizedBox(height: 14),
                   DropdownButtonFormField<String>(
                     initialValue: type,
@@ -820,7 +1616,7 @@ class _ApiListPageState extends State<_ApiListPage> {
     return fields
         .where((value) => value != null && value.toString().trim().isNotEmpty)
         .map((value) => value.toString())
-        .join(' • ');
+        .join(' â€¢ ');
   }
 
   @override

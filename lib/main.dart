@@ -321,6 +321,8 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _error;
   List<Map<String, dynamic>> _puroks = [];
   String? _selectedPurokId;
+  bool _puroksLoading = false;
+  bool _puroksLoadFailed = false;
 
   @override
   void initState() {
@@ -329,13 +331,14 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _loadPuroks() async {
+    setState(() { _puroksLoading = true; _puroksLoadFailed = false; });
     try {
       final response = await Api.req('GET', '/puroks', auth: false);
       final list = (response['puroks'] as List).cast<Map<String, dynamic>>();
-      setState(() => _puroks = list);
+      if (mounted) setState(() { _puroks = list; _puroksLoading = false; });
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not load puroks. Please check your connection and try again.');
+        setState(() { _puroksLoading = false; _puroksLoadFailed = true; });
       }
     }
   }
@@ -426,18 +429,39 @@ class _RegisterPageState extends State<RegisterPage> {
                             const SizedBox(height: 14),
                             const _FieldLabel('Assigned Purok'),
                             const SizedBox(height: 6),
-                            DropdownButtonFormField<String>(
-                              initialValue: _selectedPurokId,
-                              hint: const Text('Select Purok'),
-                              items: _puroks.map((p) => DropdownMenuItem<String>(
-                                value: p['id'].toString(),
-                                child: Text(p['name'].toString()),
-                              )).toList(),
-                              onChanged: (v) => setState(() => _selectedPurokId = v),
-                              decoration: const InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            if (_puroksLoading)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                              )
+                            else if (_puroksLoadFailed)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Text('Could not load puroks. Check your connection.',
+                                      style: TextStyle(color: Colors.red, fontSize: 13)),
+                                  const SizedBox(height: 6),
+                                  TextButton.icon(
+                                    onPressed: _loadPuroks,
+                                    icon: const Icon(Icons.refresh, size: 16),
+                                    label: const Text('Retry'),
+                                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                  ),
+                                ],
+                              )
+                            else
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedPurokId,
+                                hint: const Text('Select Purok'),
+                                items: _puroks.map((p) => DropdownMenuItem<String>(
+                                  value: p['id'].toString(),
+                                  child: Text(p['name'].toString()),
+                                )).toList(),
+                                onChanged: (v) => setState(() => _selectedPurokId = v),
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                ),
                               ),
-                            ),
                             if (_error != null) ...[
                               const SizedBox(height: 12),
                               Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),

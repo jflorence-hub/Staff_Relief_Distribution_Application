@@ -1431,13 +1431,16 @@ class ScanPage extends StatefulWidget {
 }
 
 class _ScanPageState extends State<ScanPage> {
-  final code     = TextEditingController();
-  final quantity = TextEditingController(text: '1');
+  final code            = TextEditingController();
+  final quantity        = TextEditingController(text: '1');
+  final _familyHeadCtrl = TextEditingController();
+  final _purokCtrl      = TextEditingController();
+  final _reliefCtrl     = TextEditingController();
+  final _scanDateCtrl   = TextEditingController();
+  final _scanTimeCtrl   = TextEditingController();
 
   String? _selectedFamilyId;
-  String  _familyHead  = '';
-  String  _purokName   = '';
-  String  _scanType    = 'check_in';
+  String  _scanType    = 'released';
   String  _locationId  = '';
   String  _scanDate    = '';
   String  _scanTime    = '';
@@ -1456,6 +1459,8 @@ class _ScanPageState extends State<ScanPage> {
     final now = DateTime.now();
     _scanDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     _scanTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    _scanDateCtrl.text = _scanDate;
+    _scanTimeCtrl.text = _scanTime;
     _loadFamilies();
     _loadLocations();
   }
@@ -1490,13 +1495,16 @@ class _ScanPageState extends State<ScanPage> {
       (f) => f['id'].toString() == id,
       orElse: () => {},
     );
+    final dist = fam['latest_distribution'];
+    final resource = dist is Map ? dist['resource'] : null;
     setState(() {
       _selectedFamilyId = id;
-      _familyHead = fam['head_name']?.toString()   ?? '';
-      _purokName  = (fam['purok'] is Map)
-          ? (fam['purok']['name']?.toString() ?? '')
-          : (fam['purok']?.toString() ?? '');
     });
+    _familyHeadCtrl.text = fam['head_name']?.toString() ?? '';
+    _purokCtrl.text = (fam['purok'] is Map)
+        ? (fam['purok']['name']?.toString() ?? '')
+        : (fam['purok']?.toString() ?? '');
+    _reliefCtrl.text = resource is Map ? (resource['name']?.toString() ?? '') : '';
   }
 
   Future<void> save() async {
@@ -1525,12 +1533,13 @@ class _ScanPageState extends State<ScanPage> {
           const SnackBar(content: Text('Tracking record saved.')),
         );
         setState(() {
-          _selectedFamilyId = null;
-          _familyHead = '';
-          _purokName  = '';
+          _selectedFamilyId   = null;
           code.clear();
           quantity.text = '1';
         });
+        _familyHeadCtrl.text = '';
+        _purokCtrl.text      = '';
+        _reliefCtrl.text     = '';
       }
     } catch (e) {
       if (mounted) {
@@ -1545,6 +1554,11 @@ class _ScanPageState extends State<ScanPage> {
   void dispose() {
     code.dispose();
     quantity.dispose();
+    _familyHeadCtrl.dispose();
+    _purokCtrl.dispose();
+    _reliefCtrl.dispose();
+    _scanDateCtrl.dispose();
+    _scanTimeCtrl.dispose();
     super.dispose();
   }
 
@@ -1653,7 +1667,7 @@ class _ScanPageState extends State<ScanPage> {
 
                 // Family Head (read-only)
                 TextField(
-                  controller: TextEditingController(text: _familyHead),
+                  controller: _familyHeadCtrl,
                   readOnly: true,
                   decoration: const InputDecoration(labelText: 'Family Head'),
                 ),
@@ -1661,18 +1675,19 @@ class _ScanPageState extends State<ScanPage> {
 
                 // Purok (read-only)
                 TextField(
-                  controller: TextEditingController(text: _purokName),
+                  controller: _purokCtrl,
                   readOnly: true,
                   decoration: const InputDecoration(labelText: 'Purok'),
                 ),
                 const SizedBox(height: 12),
 
                 // Relief / Resource (informational)
-                const TextField(
+                TextField(
+                  controller: _reliefCtrl,
                   readOnly: true,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Relief / Resource',
-                    hintText: '— linked via distribution record',
+                    hintText: '— auto-filled from distribution record',
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1690,12 +1705,11 @@ class _ScanPageState extends State<ScanPage> {
                   initialValue: _scanType,
                   decoration: const InputDecoration(labelText: 'Scan Status'),
                   items: const [
-                    DropdownMenuItem(value: 'check_in',  child: Text('Check In')),
-                    DropdownMenuItem(value: 'check_out', child: Text('Check Out')),
-                    DropdownMenuItem(value: 'audit',     child: Text('Audit')),
-                    DropdownMenuItem(value: 'transfer',  child: Text('Transfer')),
+                    DropdownMenuItem(value: 'released', child: Text('Released')),
+                    DropdownMenuItem(value: 'returned', child: Text('Returned')),
+                    DropdownMenuItem(value: 'verified', child: Text('Verified')),
                   ],
-                  onChanged: (v) => setState(() => _scanType = v ?? 'check_in'),
+                  onChanged: (v) => setState(() => _scanType = v ?? 'released'),
                 ),
                 const SizedBox(height: 12),
 
@@ -1713,7 +1727,7 @@ class _ScanPageState extends State<ScanPage> {
 
                 // Date
                 TextField(
-                  controller: TextEditingController(text: _scanDate),
+                  controller: _scanDateCtrl,
                   readOnly: true,
                   decoration: const InputDecoration(
                     labelText: 'Date',
@@ -1733,6 +1747,7 @@ class _ScanPageState extends State<ScanPage> {
                             '${picked.month.toString().padLeft(2, '0')}-'
                             '${picked.day.toString().padLeft(2, '0')}';
                       });
+                      _scanDateCtrl.text = _scanDate;
                     }
                   },
                 ),
@@ -1740,7 +1755,7 @@ class _ScanPageState extends State<ScanPage> {
 
                 // Time
                 TextField(
-                  controller: TextEditingController(text: _scanTime),
+                  controller: _scanTimeCtrl,
                   readOnly: true,
                   decoration: const InputDecoration(
                     labelText: 'Time',
@@ -1756,6 +1771,7 @@ class _ScanPageState extends State<ScanPage> {
                         _scanTime = '${picked.hour.toString().padLeft(2, '0')}:'
                             '${picked.minute.toString().padLeft(2, '0')}';
                       });
+                      _scanTimeCtrl.text = _scanTime;
                     }
                   },
                 ),

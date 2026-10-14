@@ -1195,46 +1195,228 @@ class StaffDashboard extends StatefulWidget {
 
 class _StaffDashboardState extends State<StaffDashboard> {
   late Future<List<Map<String, dynamic>>> future = _load();
+
   Future<List<Map<String, dynamic>>> _load() async {
-    final paths = ['/resources', '/distributions/history', '/staff/families', '/qr/scans'];
-    return Future.wait(paths.map((p) async { try { return await Api.req('GET', p); } catch (_) { return <String, dynamic>{}; } }));
+    final paths = ['/me', '/resources', '/distributions/history', '/staff/families', '/qr/scans'];
+    return Future.wait(paths.map((p) async {
+      try {
+        return await Api.req('GET', p);
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }));
   }
-  List<dynamic> _rows(Map<String, dynamic> map, String key) => map[key] is List ? map[key] as List : <dynamic>[];
-  @override Widget build(BuildContext context) => FutureBuilder<List<Map<String, dynamic>>>(future: future, builder: (context, snap) {
-    final data = snap.data ?? const <Map<String, dynamic>>[];
-    final resources = data.isNotEmpty ? _rows(data[0], 'resources') : <dynamic>[];
-    final distributions = data.length > 1 ? _rows(data[1], 'distributions') : <dynamic>[];
-    final families = data.length > 2 ? _rows(data[2], 'families') : <dynamic>[];
-    final scans = data.length > 3 ? _rows(data[3], 'scans') : <dynamic>[];
-    final pending = distributions.where((e) => (e as Map)['status']?.toString().toLowerCase() == 'pending').length;
-    final completed = distributions.where((e) => (e as Map)['status']?.toString().toLowerCase() == 'completed').length;
-    final stock = resources.fold<num>(0, (sum, e) => sum + ((e as Map)['quantity'] is num ? e['quantity'] as num : num.tryParse('${e['quantity']}') ?? 0));
-    return RefreshIndicator(onRefresh: () async => setState(() => future = _load()), child: ListView(padding: const EdgeInsets.fromLTRB(16, 18, 16, 28), children: [
-      const Text('Overview of relief operations', style: TextStyle(color: muted, fontSize: 13)),
-      const SizedBox(height: 16),
-      Row(children: [Expanded(child: _QuickAction(icon: Icons.qr_code_scanner, label: 'Scan QR', onTap: () => _showInfo(context, 'QR Tracking', 'Open QR Tracking from the bottom navigation.'))), const SizedBox(width: 10), Expanded(child: _QuickAction(icon: Icons.description_outlined, label: 'Reports', onTap: () => _showInfo(context, 'Reports', 'Open Reports from the More menu.')))]),
-      const SizedBox(height: 18),
-      if (snap.connectionState == ConnectionState.waiting) const LinearProgressIndicator(),
-      GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.42, children: [
-        _StatCard(title: 'Total Resources', value: snap.hasData ? '${resources.length}' : 'â€”', icon: Icons.inventory_2_outlined, tint: const Color(0xffeff6ff), color: blue),
-        _StatCard(title: 'Total Stock Quantity', value: snap.hasData ? '$stock' : 'â€”', icon: Icons.widgets_outlined, tint: const Color(0xffeef2ff), color: const Color(0xff4f46e5)),
-        _StatCard(title: 'Pending', value: snap.hasData ? '$pending' : 'â€”', icon: Icons.schedule_rounded, tint: const Color(0xfffffbeb), color: const Color(0xffd97706)),
-        _StatCard(title: 'In Transit / Pending', value: snap.hasData ? '$pending' : 'â€”', icon: Icons.local_shipping_outlined, tint: const Color(0xfff1f5f9), color: const Color(0xff475569)),
-        _StatCard(title: 'Completed', value: snap.hasData ? '$completed' : 'â€”', icon: Icons.check_circle_outline, tint: const Color(0xffecfdf5), color: const Color(0xff059669)),
-        _StatCard(title: 'Families', value: snap.hasData ? '${families.length}' : 'â€”', icon: Icons.groups_outlined, tint: const Color(0xffeff6ff), color: blue),
-        _StatCard(title: 'QR Scans Logged', value: snap.hasData ? '${scans.length}' : 'â€”', icon: Icons.qr_code_2_rounded, tint: const Color(0xfffaf5ff), color: const Color(0xffa855f7)),
-        _StatCard(title: 'Households Served', value: snap.hasData ? '$completed' : 'â€”', icon: Icons.volunteer_activism_outlined, tint: const Color(0xfff0fdfa), color: const Color(0xff0d9488)),
-      ]),
-      const SizedBox(height: 22),
-      _SectionCard(title: 'Recent Distributions', action: 'Refresh', onAction: () => setState(() => future = _load()), child: distributions.isEmpty ? const _EmptyState(text: 'No distributions to show yet.') : Column(children: distributions.take(4).map((e) { final m = e as Map; return _MiniRecord(icon: Icons.local_shipping_outlined, title: '${m['family_name'] ?? m['family']?['name'] ?? 'Family distribution'}', subtitle: '${m['status'] ?? 'Status unavailable'} â€¢ ${m['distribution_date'] ?? m['scheduled_at'] ?? ''}'); }).toList())),
-      const SizedBox(height: 14),
-      _SectionCard(title: 'Recent QR Scans', action: 'Refresh', onAction: () => setState(() => future = _load()), child: scans.isEmpty ? const _EmptyState(text: 'No scan records to show yet.') : Column(children: scans.take(4).map((e) { final m = e as Map; return _MiniRecord(icon: Icons.qr_code_2, title: '${m['resource']?['name'] ?? m['resource_name'] ?? 'Resource scan'}', subtitle: '${m['scan_type'] ?? 'Scan'} â€¢ ${m['scanned_at'] ?? ''}'); }).toList())),
-      const SizedBox(height: 14),
-      _SectionCard(title: 'Low Stock Alerts', child: resources.where((e) { final m = e as Map; final q = m['quantity']; final min = m['min_quantity']; return q is num && min is num && q <= min; }).isEmpty ? const _EmptyState(text: 'No low-stock alerts, or stock thresholds are unavailable.') : Column(children: resources.where((e) { final m = e as Map; return m['quantity'] is num && m['min_quantity'] is num && (m['quantity'] as num) <= (m['min_quantity'] as num); }).map((e) { final m = e as Map; return _MiniRecord(icon: Icons.warning_amber_rounded, title: '${m['name'] ?? 'Resource'}', subtitle: 'Remaining stock: ${m['quantity']}'); }).toList())),
-    ]));
-  });
+
+  List<dynamic> _rows(Map<String, dynamic> map, String key) =>
+      map[key] is List ? map[key] as List : <dynamic>[];
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<Map<String, dynamic>>>(
+        future: future,
+        builder: (context, snap) {
+          final data          = snap.data ?? const <Map<String, dynamic>>[];
+          final me            = data.isNotEmpty   ? data[0]                        : <String, dynamic>{};
+          final resources     = data.length > 1   ? _rows(data[1], 'resources')    : <dynamic>[];
+          final distributions = data.length > 2   ? _rows(data[2], 'distributions'): <dynamic>[];
+          final families      = data.length > 3   ? _rows(data[3], 'families')     : <dynamic>[];
+          final scans         = data.length > 4   ? _rows(data[4], 'scans')        : <dynamic>[];
+
+          final user         = me['user'] is Map ? me['user'] as Map<String, dynamic> : <String, dynamic>{};
+          final locationName = user['location']?['name']?.toString();
+          final purokName    = user['purok']?['name']?.toString();
+
+          final pendingOrTransit = distributions.where((e) {
+            final s = (e as Map)['status']?.toString().toLowerCase() ?? '';
+            return s == 'pending' || s == 'in_transit';
+          }).length;
+          final completed = distributions.where((e) =>
+              (e as Map)['status']?.toString().toLowerCase() == 'completed').length;
+          final stock = resources.fold<num>(0, (sum, e) {
+            final q = (e as Map)['quantity'];
+            return sum + (q is num ? q : (num.tryParse(q.toString()) ?? 0));
+          });
+
+          return RefreshIndicator(
+            onRefresh: () async => setState(() => future = _load()),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+              children: [
+                const Text('Overview of relief operations',
+                    style: TextStyle(color: muted, fontSize: 13)),
+                const SizedBox(height: 16),
+
+                // My Assignment card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xffeff6ff),
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                              child: const Icon(Icons.badge_outlined, color: blue, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'My Assignment',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: ink,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        const Divider(height: 1),
+                        const SizedBox(height: 14),
+                        _AssignmentRow(
+                          icon: Icons.location_on_outlined,
+                          label: 'Assigned Location',
+                          value: snap.hasData ? (locationName ?? 'Not assigned') : '\u2014',
+                        ),
+                        const SizedBox(height: 10),
+                        _AssignmentRow(
+                          icon: Icons.map_outlined,
+                          label: 'Assigned Purok',
+                          value: snap.hasData ? (purokName ?? 'Not assigned') : '\u2014',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Quick actions
+                Row(children: [
+                  Expanded(child: _QuickAction(icon: Icons.qr_code_scanner, label: 'Scan QR', onTap: () => _showInfo(context, 'QR Tracking', 'Open QR Tracking from the bottom navigation.'))),
+                  const SizedBox(width: 10),
+                  Expanded(child: _QuickAction(icon: Icons.description_outlined, label: 'Reports', onTap: () => _showInfo(context, 'Reports', 'Open Reports from the More menu.'))),
+                ]),
+                const SizedBox(height: 18),
+
+                if (snap.connectionState == ConnectionState.waiting)
+                  const LinearProgressIndicator(),
+
+                // Stat grid — no duplicate Pending card
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.42,
+                  children: [
+                    _StatCard(title: 'Total Resources',      value: snap.hasData ? '${resources.length}'    : '\u2014', icon: Icons.inventory_2_outlined,       tint: const Color(0xffeff6ff), color: blue),
+                    _StatCard(title: 'Total Stock Quantity',  value: snap.hasData ? '$stock'                 : '\u2014', icon: Icons.widgets_outlined,            tint: const Color(0xffeef2ff), color: const Color(0xff4f46e5)),
+                    _StatCard(title: 'Pending / In Transit',  value: snap.hasData ? '$pendingOrTransit'      : '\u2014', icon: Icons.local_shipping_outlined,     tint: const Color(0xfff1f5f9), color: const Color(0xff475569)),
+                    _StatCard(title: 'Completed',             value: snap.hasData ? '$completed'             : '\u2014', icon: Icons.check_circle_outline,        tint: const Color(0xffecfdf5), color: const Color(0xff059669)),
+                    _StatCard(title: 'Families',              value: snap.hasData ? '${families.length}'     : '\u2014', icon: Icons.groups_outlined,             tint: const Color(0xffeff6ff), color: blue),
+                    _StatCard(title: 'QR Scans Logged',       value: snap.hasData ? '${scans.length}'        : '\u2014', icon: Icons.qr_code_2_rounded,           tint: const Color(0xfffaf5ff), color: const Color(0xffa855f7)),
+                    _StatCard(title: 'Households Served',     value: snap.hasData ? '$completed'             : '\u2014', icon: Icons.volunteer_activism_outlined, tint: const Color(0xfff0fdfa), color: const Color(0xff0d9488)),
+                  ],
+                ),
+                const SizedBox(height: 22),
+
+                _SectionCard(
+                  title: 'Recent Distributions',
+                  action: 'Refresh',
+                  onAction: () => setState(() => future = _load()),
+                  child: distributions.isEmpty
+                      ? const _EmptyState(text: 'No distributions to show yet.')
+                      : Column(children: distributions.take(4).map((e) {
+                          final m = e as Map;
+                          return _MiniRecord(
+                            icon: Icons.local_shipping_outlined,
+                            title: '${m['family_name'] ?? m['family']?['name'] ?? 'Family distribution'}',
+                            subtitle: '${m['status'] ?? 'Status unavailable'} \u2022 ${m['distribution_date'] ?? m['scheduled_at'] ?? ''}',
+                          );
+                        }).toList()),
+                ),
+                const SizedBox(height: 14),
+
+                _SectionCard(
+                  title: 'Recent QR Scans',
+                  action: 'Refresh',
+                  onAction: () => setState(() => future = _load()),
+                  child: scans.isEmpty
+                      ? const _EmptyState(text: 'No scan records to show yet.')
+                      : Column(children: scans.take(4).map((e) {
+                          final m = e as Map;
+                          return _MiniRecord(
+                            icon: Icons.qr_code_2,
+                            title: '${m['resource']?['name'] ?? m['resource_name'] ?? 'Resource scan'}',
+                            subtitle: '${m['scan_type'] ?? 'Scan'} \u2022 ${m['scanned_at'] ?? ''}',
+                          );
+                        }).toList()),
+                ),
+                const SizedBox(height: 14),
+
+                _SectionCard(
+                  title: 'Low Stock Alerts',
+                  child: resources.where((e) {
+                    final m   = e as Map;
+                    final q   = m['quantity'];
+                    final min = m['minimum_threshold'] ?? m['min_quantity'];
+                    return q is num && min is num && q <= min;
+                  }).isEmpty
+                      ? const _EmptyState(text: 'No low-stock alerts, or stock thresholds are unavailable.')
+                      : Column(children: resources.where((e) {
+                          final m   = e as Map;
+                          final q   = m['quantity'];
+                          final min = m['minimum_threshold'] ?? m['min_quantity'];
+                          return q is num && min is num && q <= min;
+                        }).map((e) {
+                          final m = e as Map;
+                          return _MiniRecord(
+                            icon: Icons.warning_amber_rounded,
+                            title: '${m['name'] ?? 'Resource'}',
+                            subtitle: 'Remaining stock: ${m['quantity']}',
+                          );
+                        }).toList()),
+                ),
+              ],
+            ),
+          );
+        },
+      );
 }
 
+// Assignment row helper
+class _AssignmentRow extends StatelessWidget {
+  const _AssignmentRow({required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String   label;
+  final String   value;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: muted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 11, color: muted)),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600, color: ink)),
+              ],
+            ),
+          ),
+        ],
+      );
+}
 class _QuickAction extends StatelessWidget { final IconData icon; final String label; final VoidCallback onTap; const _QuickAction({required this.icon, required this.label, required this.onTap}); @override Widget build(BuildContext context) => OutlinedButton.icon(onPressed: onTap, icon: Icon(icon, size: 19), label: Text(label, maxLines: 1), style: OutlinedButton.styleFrom(foregroundColor: ink, backgroundColor: Colors.white, side: const BorderSide(color: Color(0xffdbe3ef)), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))); }
 class _StatCard extends StatelessWidget { final String title, value; final IconData icon; final Color tint, color; const _StatCard({required this.title, required this.value, required this.icon, required this.tint, required this.color}); @override Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(13), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Container(width: 36, height: 36, decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(11)), child: Icon(icon, color: color, size: 21)), Text(value, style: const TextStyle(fontSize: 24, height: 1.1, fontWeight: FontWeight.w800, color: ink)), Text(title, style: const TextStyle(fontSize: 11, color: muted), maxLines: 2, overflow: TextOverflow.ellipsis)]))); }
 class _SectionCard extends StatelessWidget { final String title; final String? action; final VoidCallback? onAction; final Widget child; const _SectionCard({required this.title, required this.child, this.action, this.onAction}); @override Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))), if (action != null) TextButton(onPressed: onAction, child: Text(action!))]), const SizedBox(height: 8), child]))); }
@@ -1249,45 +1431,72 @@ class ScanPage extends StatefulWidget {
 }
 
 class _ScanPageState extends State<ScanPage> {
-  final code = TextEditingController();
+  final code     = TextEditingController();
   final quantity = TextEditingController(text: '1');
-  final notes = TextEditingController();
 
-  String type = 'audit';
+  String? _selectedFamilyId;
+  String  _familyHead  = '';
+  String  _purokName   = '';
+  String  _scanType    = 'check_in';
+  String  _locationId  = '';
+  String  _scanDate    = '';
+  String  _scanTime    = '';
+
+  List<Map<String, dynamic>> _families  = [];
+  List<Map<String, dynamic>> _locations = [];
+
   String? error;
-  Map<String, dynamic>? resource;
-  bool busy = false;
-  bool cameraOpen = false;
-  bool handled = false;
+  bool busy        = false;
+  bool cameraOpen  = false;
+  bool handled     = false;
 
-  Future<void> lookup(String value) async {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      setState(() => error = 'Enter or scan a resource QR code.');
-      return;
-    }
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _scanDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    _scanTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    _loadFamilies();
+    _loadLocations();
+  }
 
-    setState(() {
-      busy = true;
-      error = null;
-      resource = null;
-      code.text = trimmed;
-    });
-
+  Future<void> _loadFamilies() async {
     try {
-      final response = await Api.req('POST', '/qr/lookup', body: {'qr_code': trimmed});
+      final response = await Api.req('GET', '/staff/families');
       if (mounted) {
-        setState(() => resource = response['resource'] as Map<String, dynamic>?);
+        final raw = response['families'] as List? ?? [];
+        setState(() {
+          _families = raw.map((e) => e as Map<String, dynamic>).toList();
+        });
       }
-    } catch (e) {
+    } catch (_) {}
+  }
+
+  Future<void> _loadLocations() async {
+    try {
+      final response = await Api.req('GET', '/locations');
       if (mounted) {
-        setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+        final raw = response['locations'] as List? ?? [];
+        setState(() {
+          _locations = raw.map((e) => e as Map<String, dynamic>).toList();
+        });
       }
-    } finally {
-      if (mounted) {
-        setState(() => busy = false);
-      }
-    }
+    } catch (_) {}
+  }
+
+  void _selectFamily(String? id) {
+    if (id == null) return;
+    final fam = _families.firstWhere(
+      (f) => f['id'].toString() == id,
+      orElse: () => {},
+    );
+    setState(() {
+      _selectedFamilyId = id;
+      _familyHead = fam['head_name']?.toString()   ?? '';
+      _purokName  = (fam['purok'] is Map)
+          ? (fam['purok']['name']?.toString() ?? '')
+          : (fam['purok']?.toString() ?? '');
+    });
   }
 
   Future<void> save() async {
@@ -1296,35 +1505,30 @@ class _ScanPageState extends State<ScanPage> {
       setState(() => error = 'Quantity must be a positive whole number.');
       return;
     }
-
-    setState(() {
-      busy = true;
-      error = null;
-    });
-
+    setState(() { busy = true; error = null; });
     try {
       await Api.req(
         'POST',
         '/qr/scan',
         body: {
-          'qr_code': code.text.trim(),
-          'scan_type': type,
-          'quantity_change': type == 'check_out'
-              ? -q
-              : (type == 'check_in' ? q : 0),
-          'location_id': resource?['location_id'],
-          'notes': notes.text.trim(),
+          'qr_code':         code.text.trim(),
+          'family_id':       int.tryParse(_selectedFamilyId ?? ''),
+          'scan_type':       _scanType,
+          'quantity_change': q,
+          'location_id':     int.tryParse(_locationId),
+          'scan_date':       _scanDate,
+          'scan_time':       _scanTime,
         },
       );
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Tracking record saved.')),
         );
         setState(() {
-          resource = null;
+          _selectedFamilyId = null;
+          _familyHead = '';
+          _purokName  = '';
           code.clear();
-          notes.clear();
           quantity.text = '1';
         });
       }
@@ -1333,9 +1537,7 @@ class _ScanPageState extends State<ScanPage> {
         setState(() => error = e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
-      if (mounted) {
-        setState(() => busy = false);
-      }
+      if (mounted) setState(() => busy = false);
     }
   }
 
@@ -1343,7 +1545,6 @@ class _ScanPageState extends State<ScanPage> {
   void dispose() {
     code.dispose();
     quantity.dispose();
-    notes.dispose();
     super.dispose();
   }
 
@@ -1352,10 +1553,8 @@ class _ScanPageState extends State<ScanPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text(
-          'Scan and track relief resources',
-          style: TextStyle(color: muted),
-        ),
+        const Text('Scan and record family relief distributions',
+            style: TextStyle(color: muted)),
         const SizedBox(height: 16),
         Card(
           child: Padding(
@@ -1374,17 +1573,14 @@ class _ScanPageState extends State<ScanPage> {
                     children: [
                       Icon(Icons.qr_code_scanner, color: blue, size: 25),
                       SizedBox(width: 10),
-                      Text(
-                        'QR Tracking',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      Text('QR Tracking',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
+
+                // Camera scanner
                 if (cameraOpen)
                   SizedBox(
                     height: 250,
@@ -1392,114 +1588,183 @@ class _ScanPageState extends State<ScanPage> {
                       borderRadius: BorderRadius.circular(12),
                       child: MobileScanner(
                         onDetect: (capture) {
-                          if (handled || capture.barcodes.isEmpty) {
-                            return;
-                          }
+                          if (handled || capture.barcodes.isEmpty) return;
                           final value = capture.barcodes.first.rawValue;
-                          if (value == null || value.isEmpty) {
-                            return;
-                          }
-                          handled = true;
+                          if (value == null || value.isEmpty) return;
+                          handled    = true;
                           cameraOpen = false;
-                          setState(() { cameraOpen = false; });
-                          lookup(value);
+                          setState(() {
+                            cameraOpen = false;
+                            code.text  = value.trim();
+                          });
+                          final match = _families.firstWhere(
+                            (f) => f['family_id']?.toString() == value.trim(),
+                            orElse: () => {},
+                          );
+                          if (match.isNotEmpty) _selectFamily(match['id'].toString());
                         },
                       ),
                     ),
                   ),
+
+                // QR code field
                 TextField(
                   controller: code,
                   decoration: InputDecoration(
-                    labelText: 'Resource QR code',
+                    labelText: 'QR code',
                     prefixIcon: const Icon(Icons.qr_code_2),
                     suffixIcon: IconButton(
                       tooltip: 'Scan with camera',
-                      onPressed: () {
-                        setState(() {
-                          cameraOpen = !cameraOpen;
-                          handled = false;
-                        });
-                      },
+                      onPressed: () => setState(() {
+                        cameraOpen = !cameraOpen;
+                        handled    = false;
+                      }),
                       icon: const Icon(Icons.camera_alt_outlined, color: blue),
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                  onPressed: busy ? null : () => lookup(code.text),
-                  icon: const Icon(Icons.search),
-                  label: const Text('Find resource'),
-                ),
+                const SizedBox(height: 12),
+
                 if (busy)
                   const Padding(
-                    padding: EdgeInsets.only(top: 12),
+                    padding: EdgeInsets.only(bottom: 12),
                     child: LinearProgressIndicator(),
                   ),
                 if (error != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(error!, style: const TextStyle(color: Colors.red)),
+                  ),
+
+                // Family dropdown
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedFamilyId,
+                  decoration: const InputDecoration(labelText: 'Family'),
+                  items: _families.map((f) => DropdownMenuItem<String>(
+                    value: f['id'].toString(),
                     child: Text(
-                      error!,
-                      style: const TextStyle(color: Colors.red),
+                      '${f['family_name'] ?? ''} - ${f['family_id'] ?? ''}',
+                      overflow: TextOverflow.ellipsis,
                     ),
+                  )).toList(),
+                  onChanged: _selectFamily,
+                ),
+                const SizedBox(height: 12),
+
+                // Family Head (read-only)
+                TextField(
+                  controller: TextEditingController(text: _familyHead),
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: 'Family Head'),
+                ),
+                const SizedBox(height: 12),
+
+                // Purok (read-only)
+                TextField(
+                  controller: TextEditingController(text: _purokName),
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: 'Purok'),
+                ),
+                const SizedBox(height: 12),
+
+                // Relief / Resource (informational)
+                const TextField(
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'Relief / Resource',
+                    hintText: '— linked via distribution record',
                   ),
-                if (resource != null) ...[
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  Text(
-                    resource!['name']?.toString() ?? 'Resource',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
+                ),
+                const SizedBox(height: 12),
+
+                // Quantity
+                TextField(
+                  controller: quantity,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Quantity'),
+                ),
+                const SizedBox(height: 12),
+
+                // Scan Status
+                DropdownButtonFormField<String>(
+                  initialValue: _scanType,
+                  decoration: const InputDecoration(labelText: 'Scan Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'check_in',  child: Text('Check In')),
+                    DropdownMenuItem(value: 'check_out', child: Text('Check Out')),
+                    DropdownMenuItem(value: 'audit',     child: Text('Audit')),
+                    DropdownMenuItem(value: 'transfer',  child: Text('Transfer')),
+                  ],
+                  onChanged: (v) => setState(() => _scanType = v ?? 'check_in'),
+                ),
+                const SizedBox(height: 12),
+
+                // Location
+                DropdownButtonFormField<String>(
+                  initialValue: _locationId.isEmpty ? null : _locationId,
+                  decoration: const InputDecoration(labelText: 'Location'),
+                  items: _locations.map((l) => DropdownMenuItem<String>(
+                    value: l['id'].toString(),
+                    child: Text(l['name']?.toString() ?? ''),
+                  )).toList(),
+                  onChanged: (v) => setState(() => _locationId = v ?? ''),
+                ),
+                const SizedBox(height: 12),
+
+                // Date
+                TextField(
+                  controller: TextEditingController(text: _scanDate),
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Date',
+                    suffixIcon: Icon(Icons.calendar_today_outlined),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Stock: ${resource!['quantity'] ?? 'â€”'} ${resource!['unit'] ?? ''}',
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: now,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null && mounted) {
+                      setState(() {
+                        _scanDate = '${picked.year}-'
+                            '${picked.month.toString().padLeft(2, '0')}-'
+                            '${picked.day.toString().padLeft(2, '0')}';
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // Time
+                TextField(
+                  controller: TextEditingController(text: _scanTime),
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Time',
+                    suffixIcon: Icon(Icons.access_time_outlined),
                   ),
-                  Text('Location: ${resource!['location']?['name'] ?? 'â€”'}'),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: type,
-                    decoration: const InputDecoration(
-                      labelText: 'Tracking action',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'check_in',
-                        child: Text('Check in / add stock'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'check_out',
-                        child: Text('Check out / remove stock'),
-                      ),
-                      DropdownMenuItem(value: 'audit', child: Text('Audit')),
-                      DropdownMenuItem(
-                        value: 'transfer',
-                        child: Text('Transfer (record only)'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setState(() => type = value ?? 'audit');
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: quantity,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Quantity'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: notes,
-                    decoration: const InputDecoration(labelText: 'Notes (optional)'),
-                  ),
-                  const SizedBox(height: 14),
-                  FilledButton(
-                    onPressed: busy ? null : save,
-                    child: const Text('Save tracking record'),
-                  ),
-                ],
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.now(),
+                    );
+                    if (picked != null && mounted) {
+                      setState(() {
+                        _scanTime = '${picked.hour.toString().padLeft(2, '0')}:'
+                            '${picked.minute.toString().padLeft(2, '0')}';
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                FilledButton(
+                  onPressed: busy ? null : save,
+                  child: const Text('Save tracking record'),
+                ),
               ],
             ),
           ),
@@ -1508,7 +1773,6 @@ class _ScanPageState extends State<ScanPage> {
     );
   }
 }
-
 class ResourcePage extends StatelessWidget { const ResourcePage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/resources', listKey: 'resources', title: 'Resources', subtitle: 'Relief supply inventory', kind: 'resource'); }
 class DistributionPage extends StatelessWidget { const DistributionPage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/distributions/history', listKey: 'distributions', title: 'Distribution', subtitle: 'Current relief distribution and history', kind: 'distribution'); }
 class FamilyListPage extends StatelessWidget { const FamilyListPage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/staff/families', listKey: 'families', title: 'Families', subtitle: 'Households in your assigned Purok', kind: 'family'); }
@@ -1566,7 +1830,8 @@ class _ApiListPageState extends State<_ApiListPage> {
   }
 
   String _title(Map<String, dynamic> row) {
-    return (row['family_name'] ??
+    return (row['family']?['family_name'] ??
+            row['family_name'] ??
             row['family']?['name'] ??
             row['resource']?['name'] ??
             row['name'] ??
@@ -1603,10 +1868,13 @@ class _ApiListPageState extends State<_ApiListPage> {
               : '${row['members_count']} household members',
         ],
       'scan' => [
+          row['family']?['family_name'],
+          row['family']?['head_name'],
           row['scan_type'],
           row['quantity_change'] == null ? null : 'Qty ${row['quantity_change']}',
-          row['scanned_at'] ?? row['created_at'],
           row['location']?['name'],
+          row['scanner']?['name'] == null ? null : 'By ${row['scanner']['name']}',
+          row['scanned_at'] ?? row['created_at'],
         ],
       'location' => [row['address'], row['purok'], row['type'], row['status']],
       'report' => [row['description'], row['created_at'] ?? row['date']],
@@ -1818,3 +2086,6 @@ class _StatusChip extends StatelessWidget {
     );
   }
 }
+
+
+

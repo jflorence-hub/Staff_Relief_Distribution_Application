@@ -1509,6 +1509,9 @@ class _ScanPageState extends State<ScanPage> {
   final _receiverCtrl = TextEditingController();
 
   List<Map<String, dynamic>> _families  = [];
+  List<Map<String, dynamic>> _familyMembers = [];
+  String? _claimedByName;
+  bool _loadingMembers = false;
 
   @override
   void initState() {
@@ -1544,6 +1547,19 @@ class _ScanPageState extends State<ScanPage> {
       });
       if (locName.isNotEmpty) _locationCtrl.text = locName;
     } catch (_) {}
+  }
+
+  Future<void> _loadFamilyMembers(String familyId) async {
+    setState(() { _loadingMembers = true; _familyMembers = []; _claimedByName = null; });
+    try {
+      final result = await Api.req('GET', '/families/$familyId/members');
+      final list = (result['members'] as List? ?? [])
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+      if (mounted) setState(() { _familyMembers = list; _loadingMembers = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingMembers = false);
+    }
   }
 
   void _onQrDecoded(String raw) async {
@@ -1607,6 +1623,7 @@ class _ScanPageState extends State<ScanPage> {
       _error       = null;
       _resourceId  = resId;
       _qtyCtrl.text = qty;
+      _claimedByName = null;
     });
     _qrCtrl.text        = scannedQr;
     _familyCtrl.text    = '${fam['family_name'] ?? ''} (${fam['family_id'] ?? ''})';
@@ -1616,6 +1633,7 @@ class _ScanPageState extends State<ScanPage> {
     _receiverCtrl.text  = fam['head_name']?.toString() ?? '';
     _dateCtrl.text      = date;
     _timeCtrl.text      = timeDisplay;
+    if (_familyId != null) _loadFamilyMembers(_familyId!);
   }
 
   Future<void> _save() async {
@@ -1630,7 +1648,7 @@ class _ScanPageState extends State<ScanPage> {
         'qr_code':         _qrCtrl.text.trim(),
         'family_id':       int.tryParse(_familyId ?? ''),
         'scan_type':       _scanType,
-        'receiver':        _receiverCtrl.text.trim().isEmpty ? null : _receiverCtrl.text.trim(),
+        'receiver':        _claimedByName ?? (_receiverCtrl.text.trim().isEmpty ? null : _receiverCtrl.text.trim()),
         'resource_id':     int.tryParse(_resourceId ?? ''),
         'quantity_change': q,
         'location_id':     int.tryParse(_locationId ?? ''),
@@ -1653,6 +1671,8 @@ class _ScanPageState extends State<ScanPage> {
       _formVisible = false; _familyId = null;
       _scanType = 'completed'; _error = null; _handled = false;
       _resourceId = null;
+      _familyMembers = [];
+      _claimedByName = null;
     });
     for (final c in [_qrCtrl, _familyCtrl, _headCtrl, _purokCtrl, _reliefCtrl, _receiverCtrl]) { c.clear(); }
     _qtyCtrl.text = '1';
@@ -1761,7 +1781,44 @@ class _ScanPageState extends State<ScanPage> {
                     const SizedBox(height: 12),
                     _ReadField(label: 'Relief / Resource', controller: _reliefCtrl, icon: Icons.inventory_2_outlined),
                     const SizedBox(height: 12),
-                    _ReadField(label: 'Receiver', controller: _receiverCtrl, icon: Icons.person_outline),
+                    if (_loadingMembers)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Row(children: [
+                          SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2)),
+                          SizedBox(width: 10),
+                          Text('Loading members…',
+                              style: TextStyle(color: muted, fontSize: 13)),
+                        ]),
+                      )
+                    else if (_familyMembers.isNotEmpty)
+                      DropdownButtonFormField<String>(
+                        initialValue: _claimedByName,
+                        decoration: const InputDecoration(
+                          labelText: 'Claimed by',
+                          prefixIcon:
+                              Icon(Icons.person_outline, size: 18),
+                        ),
+                        hint: const Text('Select family member'),
+                        items: _familyMembers
+                            .map((m) => DropdownMenuItem<String>(
+                                  value: m['name']?.toString() ??
+                                      'Member #${m['number']}',
+                                  child: Text(m['name']?.toString() ??
+                                      'Member #${m['number']}'),
+                                ))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _claimedByName = v),
+                      )
+                    else
+                      _ReadField(
+                          label: 'Claimed by',
+                          controller: _receiverCtrl,
+                          icon: Icons.person_outline),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _qtyCtrl,
@@ -3936,6 +3993,9 @@ class _ApiListPageState extends State<_ApiListPage> {
           row['quantity_change'] == null ? null : 'Qty ${row['quantity_change']}',
           row['location']?['name'],
           row['scanner']?['name'] == null ? null : 'By ${row['scanner']['name']}',
+          row['receiver'] == null || row['receiver'].toString().trim().isEmpty
+              ? null
+              : 'Claimed by: ${row['receiver']}',
           _fmtScanDate(row['scanned_at'] ?? row['created_at']),
         ],
       'location' => [row['address'], row['purok'], row['type'], row['status']],

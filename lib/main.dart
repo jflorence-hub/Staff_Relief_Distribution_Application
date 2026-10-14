@@ -1,5 +1,8 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
 
 const blue = Color(0xff2563eb);
@@ -63,7 +66,7 @@ class StaffApp extends StatelessWidget {
       );
 }
 
-// ─── Shared logo widget (Image 2 design) ────────────────────────────────────
+// ─── Shared logo widget ──────────────────────────────────────────────────────
 
 class _AppLogo extends StatelessWidget {
   const _AppLogo();
@@ -106,11 +109,7 @@ class _AppLogo extends StatelessWidget {
         const SizedBox(height: 14),
         const Text(
           'Disaster Relief',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: ink,
-          ),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: ink),
         ),
         const SizedBox(height: 3),
         const Text(
@@ -145,7 +144,7 @@ class _AppLogo extends StatelessWidget {
   }
 }
 
-// ─── Login Page (Image 1 design) ────────────────────────────────────────────
+// ─── Login Page ──────────────────────────────────────────────────────────────
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -166,10 +165,7 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _error = 'Enter your email and password.');
       return;
     }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    setState(() { _busy = true; _error = null; });
     try {
       final result = await Api.req('POST', '/login', auth: false, body: {
         'email': _email.text.trim(),
@@ -186,10 +182,7 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        setState(
-            () => _error = e.toString().replaceFirst('Exception: ', ''));
-      }
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -213,42 +206,23 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Logo
                     const Center(child: _AppLogo()),
                     const SizedBox(height: 28),
-                    // Heading outside card
-                    const Text(
-                      'Disaster Relief Resource Management',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: ink,
-                      ),
-                    ),
+                    const Text('Disaster Relief Resource Management',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: ink)),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Sign in to continue',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: muted, fontSize: 14),
-                    ),
+                    const Text('Sign in to continue',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: muted, fontSize: 14)),
                     const SizedBox(height: 24),
-                    // Form card
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Email
-                            const Text(
-                              'Email',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: ink,
-                              ),
-                            ),
+                            const _FieldLabel('Email'),
                             const SizedBox(height: 6),
                             TextField(
                               controller: _email,
@@ -256,15 +230,7 @@ class _LoginPageState extends State<LoginPage> {
                               onSubmitted: (_) => _busy ? null : _login(),
                             ),
                             const SizedBox(height: 14),
-                            // Password
-                            const Text(
-                              'Password',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: ink,
-                              ),
-                            ),
+                            const _FieldLabel('Password'),
                             const SizedBox(height: 6),
                             TextField(
                               controller: _password,
@@ -272,101 +238,53 @@ class _LoginPageState extends State<LoginPage> {
                               onSubmitted: (_) => _busy ? null : _login(),
                               decoration: InputDecoration(
                                 suffixIcon: IconButton(
-                                  onPressed: () => setState(
-                                      () => _hidePassword = !_hidePassword),
-                                  icon: Icon(
-                                    _hidePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                  ),
+                                  onPressed: () => setState(() => _hidePassword = !_hidePassword),
+                                  icon: Icon(_hidePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined),
                                 ),
                               ),
                             ),
-                            // Remember me
                             const SizedBox(height: 6),
                             Row(
                               children: [
                                 Checkbox(
                                   value: _rememberMe,
-                                  onChanged: (v) =>
-                                      setState(() => _rememberMe = v ?? false),
+                                  onChanged: (v) => setState(() => _rememberMe = v ?? false),
                                   activeColor: blue,
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   visualDensity: VisualDensity.compact,
                                 ),
                                 const SizedBox(width: 6),
-                                const Text(
-                                  'Remember me',
-                                  style: TextStyle(fontSize: 13, color: ink),
-                                ),
+                                const Text('Remember me', style: TextStyle(fontSize: 13, color: ink)),
                               ],
                             ),
-                            // Error
                             if (_error != null) ...[
                               const SizedBox(height: 10),
-                              Text(
-                                _error!,
-                                style: const TextStyle(
-                                    color: Colors.red, fontSize: 13),
-                              ),
+                              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
                             ],
                             const SizedBox(height: 14),
-                            // Sign in button
                             FilledButton(
                               onPressed: _busy ? null : _login,
                               child: _busy
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white),
-                                    )
+                                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                   : const Text('Sign in'),
                             ),
                             const SizedBox(height: 8),
-                            // Forgot password
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          const ForgotPasswordPage()),
-                                ),
-                                child: const Text(
-                                  'Forgot password?',
-                                  style: TextStyle(
-                                      color: blue,
-                                      fontWeight: FontWeight.w600),
-                                ),
+                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordPage())),
+                                child: const Text('Forgot password?', style: TextStyle(color: blue, fontWeight: FontWeight.w600)),
                               ),
                             ),
-                            // Register link
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text(
-                                  "Don't have an account? ",
-                                  style:
-                                      TextStyle(color: muted, fontSize: 13),
-                                ),
+                                const Text("Don't have an account? ", style: TextStyle(color: muted, fontSize: 13)),
                                 GestureDetector(
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (_) => const RegisterPage()),
-                                  ),
-                                  child: const Text(
-                                    'Register',
-                                    style: TextStyle(
-                                      color: blue,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                    ),
-                                  ),
+                                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterPage())),
+                                  child: const Text('Register', style: TextStyle(color: blue, fontWeight: FontWeight.w700, fontSize: 13)),
                                 ),
                               ],
                             ),
@@ -375,11 +293,9 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
-                      'Demo admin login: admin@disasterrelief.test / password',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: muted, fontSize: 11),
-                    ),
+                    const Text('Demo admin login: admin@disasterrelief.test / password',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: muted, fontSize: 11)),
                   ],
                 ),
               ),
@@ -389,7 +305,7 @@ class _LoginPageState extends State<LoginPage> {
       );
 }
 
-// ─── Register Page (Image 3 design) ─────────────────────────────────────────
+// ─── Register Page ───────────────────────────────────────────────────────────
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -409,46 +325,43 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _error;
 
   Future<void> _register() async {
-    if (_fullName.text.trim().isEmpty ||
-        _email.text.trim().isEmpty ||
-        _password.text.isEmpty) {
+    if (_fullName.text.trim().isEmpty || _email.text.trim().isEmpty || _password.text.isEmpty) {
       setState(() => _error = 'Please fill in all required fields.');
+      return;
+    }
+    // Phone validation
+    final phone = _phone.text.trim();
+    if (phone.isNotEmpty && !RegExp(r'^09\d{9}$').hasMatch(phone)) {
+      setState(() => _error = 'Phone number must start with 09 and be 11 digits.');
+      return;
+    }
+    // Password length
+    if (_password.text.length < 8) {
+      setState(() => _error = 'Password must be at least 8 characters.');
       return;
     }
     if (_password.text != _confirmPassword.text) {
       setState(() => _error = 'Passwords do not match.');
       return;
     }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    setState(() { _busy = true; _error = null; });
     try {
       await Api.req('POST', '/register', auth: false, body: {
         'name': _fullName.text.trim(),
         'email': _email.text.trim(),
-        'phone': _phone.text.trim(),
+        'phone': phone.isEmpty ? null : phone,
         'password': _password.text,
         'password_confirmation': _confirmPassword.text,
         'role': 'staff',
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text('Account created! Please sign in.')),
+          const SnackBar(content: Text('Account created! Please sign in.')),
         );
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-          (_) => false,
-        );
+        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
       }
     } catch (e) {
-      if (mounted) {
-        setState(
-            () => _error = e.toString().replaceFirst('Exception: ', ''));
-      }
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -456,11 +369,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
-    _fullName.dispose();
-    _email.dispose();
-    _phone.dispose();
-    _password.dispose();
-    _confirmPassword.dispose();
+    _fullName.dispose(); _email.dispose(); _phone.dispose();
+    _password.dispose(); _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -475,24 +385,13 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Logo
                     const Center(child: _AppLogo()),
                     const SizedBox(height: 24),
-                    const Text(
-                      'Create an account',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: ink,
-                      ),
-                    ),
+                    const Text('Create an account', textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: ink)),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Join the relief coordination team',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: muted, fontSize: 14),
-                    ),
+                    const Text('Join the relief coordination team', textAlign: TextAlign.center,
+                        style: TextStyle(color: muted, fontSize: 14)),
                     const SizedBox(height: 24),
                     Card(
                       child: Padding(
@@ -506,32 +405,26 @@ class _RegisterPageState extends State<RegisterPage> {
                             const SizedBox(height: 14),
                             const _FieldLabel('Email'),
                             const SizedBox(height: 6),
-                            TextField(
-                              controller: _email,
-                              keyboardType: TextInputType.emailAddress,
-                            ),
+                            TextField(controller: _email, keyboardType: TextInputType.emailAddress),
                             const SizedBox(height: 14),
-                            const _FieldLabel('Phone (optional)'),
+                            const _FieldLabel('Phone (optional, must start with 09)'),
                             const SizedBox(height: 6),
                             TextField(
                               controller: _phone,
                               keyboardType: TextInputType.phone,
+                              maxLength: 11,
+                              decoration: const InputDecoration(counterText: ''),
                             ),
                             const SizedBox(height: 14),
-                            const _FieldLabel('Password'),
+                            const _FieldLabel('Password (min 8 characters)'),
                             const SizedBox(height: 6),
                             TextField(
                               controller: _password,
                               obscureText: _hidePassword,
                               decoration: InputDecoration(
                                 suffixIcon: IconButton(
-                                  onPressed: () => setState(
-                                      () => _hidePassword = !_hidePassword),
-                                  icon: Icon(
-                                    _hidePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                  ),
+                                  onPressed: () => setState(() => _hidePassword = !_hidePassword),
+                                  icon: Icon(_hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                                 ),
                               ),
                             ),
@@ -543,56 +436,30 @@ class _RegisterPageState extends State<RegisterPage> {
                               obscureText: _hideConfirm,
                               decoration: InputDecoration(
                                 suffixIcon: IconButton(
-                                  onPressed: () => setState(
-                                      () => _hideConfirm = !_hideConfirm),
-                                  icon: Icon(
-                                    _hideConfirm
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                  ),
+                                  onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
+                                  icon: Icon(_hideConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                                 ),
                               ),
                             ),
                             if (_error != null) ...[
                               const SizedBox(height: 12),
-                              Text(
-                                _error!,
-                                style: const TextStyle(
-                                    color: Colors.red, fontSize: 13),
-                              ),
+                              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
                             ],
                             const SizedBox(height: 18),
                             FilledButton(
                               onPressed: _busy ? null : _register,
                               child: _busy
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white),
-                                    )
+                                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                   : const Text('Create account'),
                             ),
                             const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text(
-                                  'Already have an account? ',
-                                  style: TextStyle(
-                                      color: muted, fontSize: 13),
-                                ),
+                                const Text('Already have an account? ', style: TextStyle(color: muted, fontSize: 13)),
                                 GestureDetector(
                                   onTap: () => Navigator.pop(context),
-                                  child: const Text(
-                                    'Sign in',
-                                    style: TextStyle(
-                                      color: blue,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                    ),
-                                  ),
+                                  child: const Text('Sign in', style: TextStyle(color: blue, fontWeight: FontWeight.w700, fontSize: 13)),
                                 ),
                               ],
                             ),
@@ -609,7 +476,7 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 }
 
-// ─── Forgot Password Page (Image 4 design) ───────────────────────────────────
+// ─── Forgot Password Page ────────────────────────────────────────────────────
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -627,36 +494,21 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       setState(() => _error = 'Please enter your email address.');
       return;
     }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    setState(() { _busy = true; _error = null; });
     try {
-      await Api.req('POST', '/password/forgot', auth: false,
-          body: {'email': _email.text.trim()});
+      await Api.req('POST', '/password/forgot', auth: false, body: {'email': _email.text.trim()});
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VerifyOtpPage(email: _email.text.trim()),
-          ),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => VerifyOtpPage(email: _email.text.trim())));
       }
     } catch (e) {
-      if (mounted) {
-        setState(
-            () => _error = e.toString().replaceFirst('Exception: ', ''));
-      }
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
-  void dispose() {
-    _email.dispose();
-    super.dispose();
-  }
+  void dispose() { _email.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -672,59 +524,35 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
-                          'Recover your password',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: ink,
-                          ),
-                        ),
+                        const Text('Recover your password',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: ink)),
                         const SizedBox(height: 6),
-                        const Text(
-                          'Verify your email before creating a new password.',
-                          style: TextStyle(color: muted, fontSize: 13),
-                        ),
+                        const Text('Verify your email before creating a new password.',
+                            style: TextStyle(color: muted, fontSize: 13)),
                         const SizedBox(height: 22),
                         const _FieldLabel('Gmail address'),
                         const SizedBox(height: 6),
                         TextField(
                           controller: _email,
                           keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            hintText: 'you@gmail.com',
-                          ),
+                          decoration: const InputDecoration(hintText: 'you@gmail.com'),
                         ),
                         if (_error != null) ...[
                           const SizedBox(height: 10),
-                          Text(
-                            _error!,
-                            style: const TextStyle(
-                                color: Colors.red, fontSize: 13),
-                          ),
+                          Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
                         ],
                         const SizedBox(height: 18),
                         FilledButton(
                           onPressed: _busy ? null : _sendOtp,
                           child: _busy
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white),
-                                )
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : const Text('Send OTP'),
                         ),
                         const SizedBox(height: 14),
                         Center(
                           child: TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text(
-                              'Back to login',
-                              style: TextStyle(
-                                  color: blue, fontWeight: FontWeight.w600),
-                            ),
+                            child: const Text('Back to login', style: TextStyle(color: blue, fontWeight: FontWeight.w600)),
                           ),
                         ),
                       ],
@@ -738,12 +566,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       );
 }
 
-// ─── Verify OTP Page (Image 5 design) ────────────────────────────────────────
+// ─── Verify OTP Page ─────────────────────────────────────────────────────────
 
 class VerifyOtpPage extends StatefulWidget {
   const VerifyOtpPage({super.key, required this.email});
   final String email;
-
   @override
   State<VerifyOtpPage> createState() => _VerifyOtpPageState();
 }
@@ -758,32 +585,20 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
       setState(() => _error = 'Please enter the OTP.');
       return;
     }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    setState(() { _busy = true; _error = null; });
     try {
       await Api.req('POST', '/password/verify-otp', auth: false, body: {
         'email': widget.email,
         'otp': _otp.text.trim(),
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text('OTP verified. Please set a new password.')),
-        );
-        Navigator.pushAndRemoveUntil(
+        Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-          (_) => false,
+          MaterialPageRoute(builder: (_) => ResetPasswordPage(email: widget.email)),
         );
       }
     } catch (e) {
-      if (mounted) {
-        setState(
-            () => _error = e.toString().replaceFirst('Exception: ', ''));
-      }
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -792,26 +607,15 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
   Future<void> _resendOtp() async {
     setState(() => _error = null);
     try {
-      await Api.req('POST', '/password/forgot', auth: false,
-          body: {'email': widget.email});
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('OTP resent to your email.')),
-        );
-      }
+      await Api.req('POST', '/password/forgot', auth: false, body: {'email': widget.email});
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OTP resent to your email.')));
     } catch (e) {
-      if (mounted) {
-        setState(
-            () => _error = e.toString().replaceFirst('Exception: ', ''));
-      }
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
   @override
-  void dispose() {
-    _otp.dispose();
-    super.dispose();
-  }
+  void dispose() { _otp.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -827,34 +631,21 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
-                          'Recover your password',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: ink,
-                          ),
-                        ),
+                        const Text('Recover your password',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: ink)),
                         const SizedBox(height: 6),
-                        const Text(
-                          'Verify your email before creating a new password.',
-                          style: TextStyle(color: muted, fontSize: 13),
-                        ),
+                        const Text('Verify your email before creating a new password.',
+                            style: TextStyle(color: muted, fontSize: 13)),
                         const SizedBox(height: 16),
-                        // Green success banner
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xffecfdf5),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Text(
                             'A 6-digit OTP was sent to your email. It expires in 10 minutes.',
-                            style: TextStyle(
-                              color: Color(0xff059669),
-                              fontSize: 13,
-                            ),
+                            style: TextStyle(color: Color(0xff059669), fontSize: 13),
                           ),
                         ),
                         const SizedBox(height: 18),
@@ -864,56 +655,25 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                           controller: _otp,
                           keyboardType: TextInputType.number,
                           maxLength: 6,
-                          decoration: const InputDecoration(
-                            hintText: 'Enter OTP',
-                            counterText: '',
-                          ),
+                          decoration: const InputDecoration(hintText: 'Enter OTP', counterText: ''),
                         ),
                         if (_error != null) ...[
                           const SizedBox(height: 10),
-                          Text(
-                            _error!,
-                            style: const TextStyle(
-                                color: Colors.red, fontSize: 13),
-                          ),
+                          Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
                         ],
                         const SizedBox(height: 18),
                         FilledButton(
                           onPressed: _busy ? null : _verifyOtp,
                           child: _busy
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white),
-                                )
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : const Text('Verify OTP'),
                         ),
                         const SizedBox(height: 10),
+                        Center(child: TextButton(onPressed: _resendOtp, child: const Text('Resend OTP', style: TextStyle(color: blue, fontWeight: FontWeight.w600)))),
                         Center(
                           child: TextButton(
-                            onPressed: _resendOtp,
-                            child: const Text(
-                              'Resend OTP',
-                              style: TextStyle(
-                                  color: blue, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ),
-                        Center(
-                          child: TextButton(
-                            onPressed: () => Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const LoginPage()),
-                              (_) => false,
-                            ),
-                            child: const Text(
-                              'Back to login',
-                              style: TextStyle(
-                                  color: blue, fontWeight: FontWeight.w600),
-                            ),
+                            onPressed: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false),
+                            child: const Text('Back to login', style: TextStyle(color: blue, fontWeight: FontWeight.w600)),
                           ),
                         ),
                       ],
@@ -927,20 +687,132 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
       );
 }
 
-// ─── Shared helper ────────────────────────────────────────────────────────────
+// ─── Reset Password Page ─────────────────────────────────────────────────────
+
+class ResetPasswordPage extends StatefulWidget {
+  const ResetPasswordPage({super.key, required this.email});
+  final String email;
+  @override
+  State<ResetPasswordPage> createState() => _ResetPasswordPageState();
+}
+
+class _ResetPasswordPageState extends State<ResetPasswordPage> {
+  final _newPassword = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  bool _busy = false;
+  bool _hideNew = true;
+  bool _hideConfirm = true;
+  String? _error;
+
+  Future<void> _reset() async {
+    if (_newPassword.text.isEmpty || _confirmPassword.text.isEmpty) {
+      setState(() => _error = 'Please fill in all fields.');
+      return;
+    }
+    if (_newPassword.text.length < 8) {
+      setState(() => _error = 'Password must be at least 8 characters.');
+      return;
+    }
+    if (_newPassword.text != _confirmPassword.text) {
+      setState(() => _error = 'Passwords do not match.');
+      return;
+    }
+    setState(() { _busy = true; _error = null; });
+    try {
+      await Api.req('POST', '/password/reset', auth: false, body: {
+        'email': widget.email,
+        'new_password': _newPassword.text,
+        'new_password_confirmation': _confirmPassword.text,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password reset successfully. Please sign in.')));
+        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void dispose() { _newPassword.dispose(); _confirmPassword.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text('Set new password',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: ink)),
+                        const SizedBox(height: 6),
+                        const Text('Create a strong password for your account.',
+                            style: TextStyle(color: muted, fontSize: 13)),
+                        const SizedBox(height: 22),
+                        const _FieldLabel('New password'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _newPassword,
+                          obscureText: _hideNew,
+                          decoration: InputDecoration(
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(() => _hideNew = !_hideNew),
+                              icon: Icon(_hideNew ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        const _FieldLabel('Confirm new password'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _confirmPassword,
+                          obscureText: _hideConfirm,
+                          decoration: InputDecoration(
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
+                              icon: Icon(_hideConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                            ),
+                          ),
+                        ),
+                        if (_error != null) ...[
+                          const SizedBox(height: 10),
+                          Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                        ],
+                        const SizedBox(height: 18),
+                        FilledButton(
+                          onPressed: _busy ? null : _reset,
+                          child: _busy
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Reset password'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
 class _FieldLabel extends StatelessWidget {
   const _FieldLabel(this.text);
   final String text;
   @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: ink,
-        ),
-      );
+  Widget build(BuildContext context) => Text(text,
+      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ink));
 }
 
 class NavItem {
@@ -949,6 +821,8 @@ class NavItem {
   final Widget page;
   const NavItem(this.title, this.icon, this.page);
 }
+
+// ─── Staff Home ───────────────────────────────────────────────────────────────
 
 class StaffHome extends StatefulWidget {
   const StaffHome({super.key});
@@ -959,6 +833,8 @@ class StaffHome extends StatefulWidget {
 class _StaffHomeState extends State<StaffHome> {
   int index = 0;
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  Timer? _announcementTimer;
+
   late final List<NavItem> items = const [
     NavItem('Dashboard', Icons.grid_view_rounded, StaffDashboard()),
     NavItem('Resources', Icons.inventory_2_outlined, ResourcePage()),
@@ -971,18 +847,81 @@ class _StaffHomeState extends State<StaffHome> {
     NavItem('Scan History', Icons.history_rounded, ScanHistoryPage()),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _announcementTimer = Timer.periodic(const Duration(seconds: 60), (_) => _checkAnnouncements());
+  }
+
+  @override
+  void dispose() {
+    _announcementTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkAnnouncements() async {
+    if (!mounted) return;
+    try {
+      final result = await Api.req('GET', '/announcements');
+      final list = result['announcements'] as List? ?? result['data'] as List? ?? [];
+      if (list.isEmpty || !mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      final lastId = prefs.getInt('last_staff_announcement_id') ?? 0;
+      final newItems = list.where((a) {
+        final id = (a as Map)['id'];
+        return id is int ? id > lastId : (int.tryParse(id.toString()) ?? 0) > lastId;
+      }).toList();
+      if (newItems.isEmpty || !mounted) return;
+      final latest = newItems.last as Map;
+      final newMaxId = list.fold<int>(0, (m, a) {
+        final id = (a as Map)['id'];
+        final i = id is int ? id : (int.tryParse(id.toString()) ?? 0);
+        return i > m ? i : m;
+      });
+      await prefs.setInt('last_staff_announcement_id', newMaxId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(latest['title']?.toString() ?? 'New announcement'),
+          action: SnackBarAction(
+            label: 'View',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: Text(latest['title']?.toString() ?? 'Announcement'),
+                  content: Text(latest['body']?.toString() ?? ''),
+                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+                ),
+              );
+            },
+          ),
+        ));
+      }
+    } catch (_) {}
+  }
+
   Future<void> logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to log out?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Log out', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     try {
       await Api.req('POST', '/logout');
     } catch (_) {}
-
     await Api.clearToken();
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-        (_) => false,
-      );
+      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
     }
   }
 
@@ -998,37 +937,16 @@ class _StaffHomeState extends State<StaffHome> {
             Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(
-                color: blue,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: const Center(
-                child: Text(
-                  'DR',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
+              decoration: BoxDecoration(color: blue, borderRadius: BorderRadius.circular(11)),
+              child: const Center(child: Text('DR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13))),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    selected.title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Text(
-                    'Disaster Relief',
-                    style: TextStyle(color: muted, fontSize: 11),
-                  ),
+                  Text(selected.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const Text('Disaster Relief', style: TextStyle(color: muted, fontSize: 11)),
                 ],
               ),
             ),
@@ -1037,34 +955,26 @@ class _StaffHomeState extends State<StaffHome> {
         actions: [
           IconButton(
             tooltip: 'Notifications',
-            onPressed: () => _showInfo(
-              context,
-              'Notifications',
-              'Notifications will appear here when supported by the API.',
-            ),
+            onPressed: () => _showInfo(context, 'Notifications', 'Notifications will appear here when supported by the API.'),
             icon: const Icon(Icons.notifications_none_rounded),
           ),
           PopupMenuButton<String>(
             icon: const CircleAvatar(
               radius: 16,
               backgroundColor: Color(0xffdbeafe),
-              child: Text(
-                'S',
-                style: TextStyle(color: blue, fontWeight: FontWeight.bold),
-              ),
+              child: Text('S', style: TextStyle(color: blue, fontWeight: FontWeight.bold)),
             ),
             onSelected: (value) {
               if (value == 'logout') {
                 logout();
+              } else if (value == 'profile') {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
               } else {
-                _showInfo(
-                  context,
-                  'Staff account',
-                  'Signed in with a staff account.',
-                );
+                _showInfo(context, 'Staff account', 'Signed in with a staff account.');
               }
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(value: 'profile', child: Text('Profile')),
               PopupMenuItem(value: 'account', child: Text('Account')),
               PopupMenuItem(value: 'logout', child: Text('Log out')),
             ],
@@ -1084,36 +994,16 @@ class _StaffHomeState extends State<StaffHome> {
                     Container(
                       width: 44,
                       height: 44,
-                      decoration: BoxDecoration(
-                        color: blue,
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'DR',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      decoration: BoxDecoration(color: blue, borderRadius: BorderRadius.circular(13)),
+                      child: const Center(child: Text('DR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                     ),
                     const SizedBox(width: 12),
                     const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Disaster Relief',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                          ),
-                        ),
+                        Text('Disaster Relief', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                         SizedBox(height: 3),
-                        Text(
-                          'Staff application',
-                          style: TextStyle(color: muted, fontSize: 12),
-                        ),
+                        Text('Staff application', style: TextStyle(color: muted, fontSize: 12)),
                       ],
                     ),
                   ],
@@ -1123,22 +1013,26 @@ class _StaffHomeState extends State<StaffHome> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                   children: [
+                    ListTile(
+                      leading: const Icon(Icons.person_outline, color: muted),
+                      title: const Text('Profile', style: TextStyle(color: ink, fontWeight: FontWeight.w500)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
+                      },
+                    ),
+                    const Divider(height: 12),
                     for (var i = 0; i < items.length; i++)
                       ListTile(
                         leading: Icon(items[i].icon, color: i == index ? blue : muted),
-                        title: Text(
-                          items[i].title,
-                          style: TextStyle(
-                            color: i == index ? blue : ink,
-                            fontWeight:
-                                i == index ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
+                        title: Text(items[i].title,
+                            style: TextStyle(
+                                color: i == index ? blue : ink,
+                                fontWeight: i == index ? FontWeight.w700 : FontWeight.w500)),
                         selected: i == index,
                         selectedTileColor: const Color(0xffeff6ff),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         onTap: () {
                           setState(() => index = i);
                           Navigator.pop(context);
@@ -1150,10 +1044,7 @@ class _StaffHomeState extends State<StaffHome> {
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text(
-                  'Log out',
-                  style: TextStyle(color: Colors.red),
-                ),
+                title: const Text('Log out', style: TextStyle(color: Colors.red)),
                 onTap: logout,
               ),
             ],
@@ -1186,7 +1077,14 @@ class _StaffHomeState extends State<StaffHome> {
   }
 }
 
-void _showInfo(BuildContext context, String title, String message) => showDialog<void>(context: context, builder: (_) => AlertDialog(title: Text(title), content: Text(message), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))]));
+void _showInfo(BuildContext context, String title, String message) => showDialog<void>(
+    context: context,
+    builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))]));
+
+// ─── Staff Dashboard ──────────────────────────────────────────────────────────
 
 class StaffDashboard extends StatefulWidget {
   const StaffDashboard({super.key});
@@ -1199,11 +1097,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
   Future<List<Map<String, dynamic>>> _load() async {
     final paths = ['/me', '/resources', '/distributions/history', '/staff/families', '/qr/scans'];
     return Future.wait(paths.map((p) async {
-      try {
-        return await Api.req('GET', p);
-      } catch (_) {
-        return <String, dynamic>{};
-      }
+      try { return await Api.req('GET', p); } catch (_) { return <String, dynamic>{}; }
     }));
   }
 
@@ -1215,15 +1109,16 @@ class _StaffDashboardState extends State<StaffDashboard> {
         future: future,
         builder: (context, snap) {
           final data          = snap.data ?? const <Map<String, dynamic>>[];
-          final me            = data.isNotEmpty   ? data[0]                        : <String, dynamic>{};
-          final resources     = data.length > 1   ? _rows(data[1], 'resources')    : <dynamic>[];
-          final distributions = data.length > 2   ? _rows(data[2], 'distributions'): <dynamic>[];
-          final families      = data.length > 3   ? _rows(data[3], 'families')     : <dynamic>[];
-          final scans         = data.length > 4   ? _rows(data[4], 'scans')        : <dynamic>[];
+          final me            = data.isNotEmpty   ? data[0]                         : <String, dynamic>{};
+          final resources     = data.length > 1   ? _rows(data[1], 'resources')     : <dynamic>[];
+          final distributions = data.length > 2   ? _rows(data[2], 'distributions') : <dynamic>[];
+          final families      = data.length > 3   ? _rows(data[3], 'families')      : <dynamic>[];
+          final scans         = data.length > 4   ? _rows(data[4], 'scans')         : <dynamic>[];
 
           final user         = me['user'] is Map ? me['user'] as Map<String, dynamic> : <String, dynamic>{};
           final locationName = user['location']?['name']?.toString();
           final purokName    = user['purok']?['name']?.toString();
+          final staffName    = user['name']?.toString();
 
           final pendingOrTransit = distributions.where((e) {
             final s = (e as Map)['status']?.toString().toLowerCase() ?? '';
@@ -1241,8 +1136,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
               children: [
-                const Text('Overview of relief operations',
-                    style: TextStyle(color: muted, fontSize: 13)),
+                const Text('Overview of relief operations', style: TextStyle(color: muted, fontSize: 13)),
                 const SizedBox(height: 16),
 
                 // My Assignment card
@@ -1255,23 +1149,12 @@ class _StaffDashboardState extends State<StaffDashboard> {
                         Row(
                           children: [
                             Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: const Color(0xffeff6ff),
-                                borderRadius: BorderRadius.circular(11),
-                              ),
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(11)),
                               child: const Icon(Icons.badge_outlined, color: blue, size: 20),
                             ),
                             const SizedBox(width: 10),
-                            const Text(
-                              'My Assignment',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: ink,
-                              ),
-                            ),
+                            const Text('My Assignment', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: ink)),
                           ],
                         ),
                         const SizedBox(height: 14),
@@ -1288,24 +1171,22 @@ class _StaffDashboardState extends State<StaffDashboard> {
                           label: 'Assigned Purok',
                           value: snap.hasData ? (purokName ?? 'Not assigned') : '\u2014',
                         ),
+                        const SizedBox(height: 10),
+                        _AssignmentRow(
+                          icon: Icons.person_outline,
+                          label: 'Purok Handler',
+                          value: snap.hasData ? (staffName ?? 'Unknown') : '\u2014',
+                        ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
-
-                // Quick actions
-                Row(children: [
-                  Expanded(child: _QuickAction(icon: Icons.qr_code_scanner, label: 'Scan QR', onTap: () => _showInfo(context, 'QR Tracking', 'Open QR Tracking from the bottom navigation.'))),
-                  const SizedBox(width: 10),
-                  Expanded(child: _QuickAction(icon: Icons.description_outlined, label: 'Reports', onTap: () => _showInfo(context, 'Reports', 'Open Reports from the More menu.'))),
-                ]),
                 const SizedBox(height: 18),
 
                 if (snap.connectionState == ConnectionState.waiting)
                   const LinearProgressIndicator(),
 
-                // Stat grid — no duplicate Pending card
+                // Stat grid
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -1362,16 +1243,14 @@ class _StaffDashboardState extends State<StaffDashboard> {
                 _SectionCard(
                   title: 'Low Stock Alerts',
                   child: resources.where((e) {
-                    final m   = e as Map;
-                    final q   = m['quantity'];
-                    final min = m['minimum_threshold'] ?? m['min_quantity'];
+                    final m = e as Map;
+                    final q = m['quantity']; final min = m['minimum_threshold'] ?? m['min_quantity'];
                     return q is num && min is num && q <= min;
                   }).isEmpty
                       ? const _EmptyState(text: 'No low-stock alerts, or stock thresholds are unavailable.')
                       : Column(children: resources.where((e) {
-                          final m   = e as Map;
-                          final q   = m['quantity'];
-                          final min = m['minimum_threshold'] ?? m['min_quantity'];
+                          final m = e as Map;
+                          final q = m['quantity']; final min = m['minimum_threshold'] ?? m['min_quantity'];
                           return q is num && min is num && q <= min;
                         }).map((e) {
                           final m = e as Map;
@@ -1392,10 +1271,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
 // Assignment row helper
 class _AssignmentRow extends StatelessWidget {
   const _AssignmentRow({required this.icon, required this.label, required this.value});
-  final IconData icon;
-  final String   label;
-  final String   value;
-
+  final IconData icon; final String label; final String value;
   @override
   Widget build(BuildContext context) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1408,394 +1284,1771 @@ class _AssignmentRow extends StatelessWidget {
               children: [
                 Text(label, style: const TextStyle(fontSize: 11, color: muted)),
                 const SizedBox(height: 2),
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600, color: ink)),
+                Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: ink)),
               ],
             ),
           ),
         ],
       );
 }
-class _QuickAction extends StatelessWidget { final IconData icon; final String label; final VoidCallback onTap; const _QuickAction({required this.icon, required this.label, required this.onTap}); @override Widget build(BuildContext context) => OutlinedButton.icon(onPressed: onTap, icon: Icon(icon, size: 19), label: Text(label, maxLines: 1), style: OutlinedButton.styleFrom(foregroundColor: ink, backgroundColor: Colors.white, side: const BorderSide(color: Color(0xffdbe3ef)), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))); }
-class _StatCard extends StatelessWidget { final String title, value; final IconData icon; final Color tint, color; const _StatCard({required this.title, required this.value, required this.icon, required this.tint, required this.color}); @override Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(13), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Container(width: 36, height: 36, decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(11)), child: Icon(icon, color: color, size: 21)), Text(value, style: const TextStyle(fontSize: 24, height: 1.1, fontWeight: FontWeight.w800, color: ink)), Text(title, style: const TextStyle(fontSize: 11, color: muted), maxLines: 2, overflow: TextOverflow.ellipsis)]))); }
-class _SectionCard extends StatelessWidget { final String title; final String? action; final VoidCallback? onAction; final Widget child; const _SectionCard({required this.title, required this.child, this.action, this.onAction}); @override Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))), if (action != null) TextButton(onPressed: onAction, child: Text(action!))]), const SizedBox(height: 8), child]))); }
-class _EmptyState extends StatelessWidget { final String text; const _EmptyState({required this.text}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4), child: Center(child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: muted, fontSize: 13)))); }
-class _MiniRecord extends StatelessWidget { final IconData icon; final String title, subtitle; const _MiniRecord({required this.icon, required this.title, required this.subtitle}); @override Widget build(BuildContext context) => ListTile(contentPadding: EdgeInsets.zero, leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: blue, size: 20)), title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text(subtitle.trim().isEmpty ? 'â€”' : subtitle, style: const TextStyle(fontSize: 11, color: muted), maxLines: 1, overflow: TextOverflow.ellipsis)); }
+
+class _StatCard extends StatelessWidget {
+  final String title, value; final IconData icon; final Color tint, color;
+  const _StatCard({required this.title, required this.value, required this.icon, required this.tint, required this.color});
+  @override
+  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(13), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Container(width: 36, height: 36, decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(11)), child: Icon(icon, color: color, size: 21)), Text(value, style: const TextStyle(fontSize: 24, height: 1.1, fontWeight: FontWeight.w800, color: ink)), Text(title, style: const TextStyle(fontSize: 11, color: muted), maxLines: 2, overflow: TextOverflow.ellipsis)])));
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title; final String? action; final VoidCallback? onAction; final Widget child;
+  const _SectionCard({required this.title, required this.child, this.action, this.onAction});
+  @override
+  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))), if (action != null) TextButton(onPressed: onAction, child: Text(action!))]), const SizedBox(height: 8), child])));
+}
+
+class _EmptyState extends StatelessWidget {
+  final String text;
+  const _EmptyState({required this.text});
+  @override
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4), child: Center(child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: muted, fontSize: 13))));
+}
+
+class _MiniRecord extends StatelessWidget {
+  final IconData icon; final String title, subtitle;
+  const _MiniRecord({required this.icon, required this.title, required this.subtitle});
+  @override
+  Widget build(BuildContext context) => ListTile(contentPadding: EdgeInsets.zero, leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: blue, size: 20)), title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text(subtitle.trim().isEmpty ? '\u2014' : subtitle, style: const TextStyle(fontSize: 11, color: muted), maxLines: 1, overflow: TextOverflow.ellipsis));
+}
+
+// ─── Scan Page (QR Tracking) ──────────────────────────────────────────────────
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
-
   @override
   State<ScanPage> createState() => _ScanPageState();
 }
 
 class _ScanPageState extends State<ScanPage> {
-  final code            = TextEditingController();
-  final quantity        = TextEditingController(text: '1');
-  final _familyHeadCtrl = TextEditingController();
-  final _purokCtrl      = TextEditingController();
-  final _reliefCtrl     = TextEditingController();
-  final _scanDateCtrl   = TextEditingController();
-  final _scanTimeCtrl   = TextEditingController();
+  final _qrCtrl       = TextEditingController();
+  final _familyCtrl   = TextEditingController();
+  final _headCtrl     = TextEditingController();
+  final _purokCtrl    = TextEditingController();
+  final _reliefCtrl   = TextEditingController();
+  final _qtyCtrl      = TextEditingController(text: '1');
+  final _locationCtrl = TextEditingController();
+  final _dateCtrl     = TextEditingController();
+  final _timeCtrl     = TextEditingController();
+  final _manualCodeCtrl = TextEditingController();
 
-  String? _selectedFamilyId;
-  String  _scanType    = 'released';
-  String  _locationId  = '';
-  String  _scanDate    = '';
-  String  _scanTime    = '';
+  String? _familyId;
+  String? _locationId;
+  String  _scanType   = 'released';
+  String  _scanDate   = '';
+  String  _scanTime   = '';
+  bool    _formVisible = false;
+  bool    _cameraOpen  = false;
+  bool    _handled     = false;
+  bool    _busy        = false;
+  String? _error;
 
   List<Map<String, dynamic>> _families  = [];
   List<Map<String, dynamic>> _locations = [];
 
-  String? error;
-  bool busy        = false;
-  bool cameraOpen  = false;
-  bool handled     = false;
-
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _scanDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    _scanTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    _scanDateCtrl.text = _scanDate;
-    _scanTimeCtrl.text = _scanTime;
-    _loadFamilies();
-    _loadLocations();
-  }
-
-  Future<void> _loadFamilies() async {
-    try {
-      final response = await Api.req('GET', '/staff/families');
-      if (mounted) {
-        final raw = response['families'] as List? ?? [];
-        setState(() {
-          _families = raw.map((e) => e as Map<String, dynamic>).toList();
-        });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _loadLocations() async {
-    try {
-      final response = await Api.req('GET', '/locations');
-      if (mounted) {
-        final raw = response['locations'] as List? ?? [];
-        setState(() {
-          _locations = raw.map((e) => e as Map<String, dynamic>).toList();
-        });
-      }
-    } catch (_) {}
-  }
-
-  void _selectFamily(String? id) {
-    if (id == null) return;
-    final fam = _families.firstWhere(
-      (f) => f['id'].toString() == id,
-      orElse: () => {},
-    );
-    final dist = fam['latest_distribution'];
-    final resource = dist is Map ? dist['resource'] : null;
-    setState(() {
-      _selectedFamilyId = id;
-    });
-    _familyHeadCtrl.text = fam['head_name']?.toString() ?? '';
-    _purokCtrl.text = (fam['purok'] is Map)
-        ? (fam['purok']['name']?.toString() ?? '')
-        : (fam['purok']?.toString() ?? '');
-    _reliefCtrl.text = resource is Map ? (resource['name']?.toString() ?? '') : '';
-  }
-
-  Future<void> save() async {
-    final q = int.tryParse(quantity.text);
-    if (q == null || q < 1) {
-      setState(() => error = 'Quantity must be a positive whole number.');
-      return;
-    }
-    setState(() { busy = true; error = null; });
-    try {
-      await Api.req(
-        'POST',
-        '/qr/scan',
-        body: {
-          'qr_code':         code.text.trim(),
-          'family_id':       int.tryParse(_selectedFamilyId ?? ''),
-          'scan_type':       _scanType,
-          'quantity_change': q,
-          'location_id':     int.tryParse(_locationId),
-          'scan_date':       _scanDate,
-          'scan_time':       _scanTime,
-        },
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tracking record saved.')),
-        );
-        setState(() {
-          _selectedFamilyId   = null;
-          code.clear();
-          quantity.text = '1';
-        });
-        _familyHeadCtrl.text = '';
-        _purokCtrl.text      = '';
-        _reliefCtrl.text     = '';
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => error = e.toString().replaceFirst('Exception: ', ''));
-      }
-    } finally {
-      if (mounted) setState(() => busy = false);
-    }
+    _loadData();
   }
 
   @override
   void dispose() {
-    code.dispose();
-    quantity.dispose();
-    _familyHeadCtrl.dispose();
-    _purokCtrl.dispose();
-    _reliefCtrl.dispose();
-    _scanDateCtrl.dispose();
-    _scanTimeCtrl.dispose();
+    _qrCtrl.dispose(); _familyCtrl.dispose(); _headCtrl.dispose();
+    _purokCtrl.dispose(); _reliefCtrl.dispose(); _qtyCtrl.dispose();
+    _locationCtrl.dispose(); _dateCtrl.dispose(); _timeCtrl.dispose();
+    _manualCodeCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final results = await Future.wait([
+        Api.req('GET', '/staff/families').catchError((_) => <String, dynamic>{}),
+        Api.req('GET', '/me').catchError((_) => <String, dynamic>{}),
+      ]);
+      if (!mounted) return;
+      final familiesRaw = results[0]['families'] as List? ?? [];
+      final user = (results[1]['user'] is Map)
+          ? results[1]['user'] as Map<String, dynamic>
+          : <String, dynamic>{};
+      final locId   = user['location_id']?.toString() ?? '';
+      final locName = user['location']?['name']?.toString() ?? '';
+      setState(() {
+        _families  = familiesRaw.map((e) => e as Map<String, dynamic>).toList();
+        _locationId = locId;
+      });
+      if (locName.isNotEmpty) _locationCtrl.text = locName;
+    } catch (_) {}
+
+    try {
+      final res = await Api.req('GET', '/locations');
+      if (mounted) {
+        final raw = res['locations'] as List? ?? [];
+        setState(() => _locations = raw.map((e) => e as Map<String, dynamic>).toList());
+      }
+    } catch (_) {}
+  }
+
+  void _onQrDecoded(String raw) async {
+    final value = raw.trim();
+    if (value.isEmpty) return;
+
+    // 1. Local lookup
+    final match = _families.firstWhere(
+      (f) => f['family_id']?.toString() == value,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (match.isNotEmpty) {
+      _populateForm(match, scannedQr: value);
+      return;
+    }
+
+    // 2. API fallback
+    try {
+      final result = await Api.req('POST', '/distributions/lookup-by-qr', body: {'qr_code': value});
+      if (result['found'] == true) {
+        final family = result['family'] as Map<String, dynamic>? ?? {};
+        if (family.isNotEmpty) {
+          _populateForm(family, scannedQr: value);
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // 3. Not found
+    setState(() {
+      _error       = 'No family found for QR code "$value".';
+      _formVisible = false;
+    });
+  }
+
+  void _populateForm(Map<String, dynamic> fam, {String scannedQr = ''}) {
+    final dist     = fam['latest_distribution'];
+    final resource = dist is Map ? dist['resource'] : null;
+    final now      = DateTime.now();
+    final date = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
+    final time = '${now.hour.toString().padLeft(2,'0')}:${now.minute.toString().padLeft(2,'0')}';
+    final purok = (fam['purok'] is Map)
+        ? (fam['purok']['name']?.toString() ?? '')
+        : (fam['purok']?.toString() ?? '');
+    final qty = (dist is Map && dist['quantity'] != null) ? dist['quantity'].toString() : '1';
+
+    setState(() {
+      _familyId    = fam['id']?.toString();
+      _scanDate    = date;
+      _scanTime    = time;
+      _formVisible = true;
+      _error       = null;
+      _qtyCtrl.text = qty;
+    });
+    _qrCtrl.text     = scannedQr;
+    _familyCtrl.text = '${fam['family_name'] ?? ''} (${fam['family_id'] ?? ''})';
+    _headCtrl.text   = fam['head_name']?.toString() ?? '';
+    _purokCtrl.text  = purok;
+    _reliefCtrl.text = resource is Map ? (resource['name']?.toString() ?? '') : '';
+    _dateCtrl.text   = date;
+    _timeCtrl.text   = time;
+  }
+
+  Future<void> _save() async {
+    final q = int.tryParse(_qtyCtrl.text);
+    if (q == null || q < 1) {
+      setState(() => _error = 'Quantity must be a positive whole number.');
+      return;
+    }
+    setState(() { _busy = true; _error = null; });
+    try {
+      await Api.req('POST', '/qr/scan', body: {
+        'qr_code':         _qrCtrl.text.trim(),
+        'family_id':       int.tryParse(_familyId ?? ''),
+        'scan_type':       _scanType,
+        'quantity_change': q,
+        'location_id':     int.tryParse(_locationId ?? ''),
+        'scan_date':       _scanDate,
+        'scan_time':       _scanTime,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tracking record saved.')));
+        _resetForm();
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _resetForm() {
+    setState(() {
+      _formVisible = false; _familyId = null;
+      _scanType = 'released'; _error = null; _handled = false;
+    });
+    for (final c in [_qrCtrl, _familyCtrl, _headCtrl, _purokCtrl, _reliefCtrl]) { c.clear(); }
+    _qtyCtrl.text = '1';
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text('Scan and record family relief distributions',
-            style: TextStyle(color: muted)),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: const Color(0xffeff6ff),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.qr_code_scanner, color: blue, size: 25),
-                      SizedBox(width: 10),
-                      Text('QR Tracking',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
+    final screenHeight = MediaQuery.of(context).size.height;
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const Text('Scan a family QR code to record relief distribution', style: TextStyle(color: muted)),
+                  const SizedBox(height: 12),
 
-                // Camera scanner
-                if (cameraOpen)
-                  SizedBox(
-                    height: 250,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: MobileScanner(
-                        onDetect: (capture) {
-                          if (handled || capture.barcodes.isEmpty) return;
-                          final value = capture.barcodes.first.rawValue;
-                          if (value == null || value.isEmpty) return;
-                          handled    = true;
-                          cameraOpen = false;
-                          setState(() {
-                            cameraOpen = false;
-                            code.text  = value.trim();
-                          });
-                          final match = _families.firstWhere(
-                            (f) => f['family_id']?.toString() == value.trim(),
-                            orElse: () => {},
-                          );
-                          if (match.isNotEmpty) _selectFamily(match['id'].toString());
-                        },
+                  // Camera viewfinder
+                  if (_cameraOpen)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: SizedBox(
+                        height: screenHeight * 0.35,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: MobileScanner(
+                            onDetect: (capture) {
+                              if (_handled || capture.barcodes.isEmpty) return;
+                              final value = capture.barcodes.first.rawValue;
+                              if (value == null || value.isEmpty) return;
+                              _handled = true;
+                              setState(() => _cameraOpen = false);
+                              _onQrDecoded(value);
+                            },
+                          ),
+                        ),
                       ),
                     ),
-                  ),
 
-                // QR code field
-                TextField(
-                  controller: code,
-                  decoration: InputDecoration(
-                    labelText: 'QR code',
-                    prefixIcon: const Icon(Icons.qr_code_2),
-                    suffixIcon: IconButton(
-                      tooltip: 'Scan with camera',
-                      onPressed: () => setState(() {
-                        cameraOpen = !cameraOpen;
-                        handled    = false;
-                      }),
-                      icon: const Icon(Icons.camera_alt_outlined, color: blue),
+                  // Camera toggle
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() { _cameraOpen = !_cameraOpen; _handled = false; }),
+                    icon: Icon(_cameraOpen ? Icons.camera_alt : Icons.camera_alt_outlined, size: 18),
+                    label: Text(_cameraOpen ? 'Stop camera' : 'Start camera'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: blue,
+                      side: const BorderSide(color: blue),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-                if (busy)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 12),
-                    child: LinearProgressIndicator(),
-                  ),
-                if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(error!, style: const TextStyle(color: Colors.red)),
+                  // Manual code input
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _manualCodeCtrl,
+                          decoration: const InputDecoration(labelText: 'Family Distribution Code'),
+                          onSubmitted: (v) { final code = v.trim(); if (code.isNotEmpty) _onQrDecoded(code); },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () {
+                          final code = _manualCodeCtrl.text.trim();
+                          if (code.isNotEmpty) _onQrDecoded(code);
+                        },
+                        child: const Text('Look up'),
+                      ),
+                    ],
                   ),
 
-                // Family dropdown
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedFamilyId,
-                  decoration: const InputDecoration(labelText: 'Family'),
-                  items: _families.map((f) => DropdownMenuItem<String>(
-                    value: f['id'].toString(),
-                    child: Text(
-                      '${f['family_name'] ?? ''} - ${f['family_id'] ?? ''}',
-                      overflow: TextOverflow.ellipsis,
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
                     ),
-                  )).toList(),
-                  onChanged: _selectFamily,
-                ),
-                const SizedBox(height: 12),
 
-                // Family Head (read-only)
-                TextField(
-                  controller: _familyHeadCtrl,
-                  readOnly: true,
-                  decoration: const InputDecoration(labelText: 'Family Head'),
-                ),
-                const SizedBox(height: 12),
+                  if (!_formVisible && _error == null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 18, bottom: 6),
+                      child: Column(
+                        children: [
+                          Icon(Icons.qr_code_2_rounded, size: 48, color: muted.withValues(alpha: 0.4)),
+                          const SizedBox(height: 8),
+                          const Text('Scan a family QR code or enter a code above to begin',
+                              style: TextStyle(color: muted, fontSize: 13), textAlign: TextAlign.center),
+                        ],
+                      ),
+                    ),
 
-                // Purok (read-only)
-                TextField(
-                  controller: _purokCtrl,
-                  readOnly: true,
-                  decoration: const InputDecoration(labelText: 'Purok'),
-                ),
-                const SizedBox(height: 12),
-
-                // Relief / Resource (informational)
-                TextField(
-                  controller: _reliefCtrl,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Relief / Resource',
-                    hintText: '— auto-filled from distribution record',
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Quantity
-                TextField(
-                  controller: quantity,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Quantity'),
-                ),
-                const SizedBox(height: 12),
-
-                // Scan Status
-                DropdownButtonFormField<String>(
-                  initialValue: _scanType,
-                  decoration: const InputDecoration(labelText: 'Scan Status'),
-                  items: const [
-                    DropdownMenuItem(value: 'released', child: Text('Released')),
-                    DropdownMenuItem(value: 'returned', child: Text('Returned')),
-                    DropdownMenuItem(value: 'verified', child: Text('Verified')),
+                  // Auto-filled form
+                  if (_formVisible) ...[
+                    const SizedBox(height: 20),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    _ReadField(label: 'Family', controller: _familyCtrl, icon: Icons.groups_outlined),
+                    const SizedBox(height: 12),
+                    _ReadField(label: 'Family Head', controller: _headCtrl, icon: Icons.person_outlined),
+                    const SizedBox(height: 12),
+                    _ReadField(label: 'Purok', controller: _purokCtrl, icon: Icons.map_outlined),
+                    const SizedBox(height: 12),
+                    _ReadField(label: 'Relief / Resource', controller: _reliefCtrl, icon: Icons.inventory_2_outlined),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _qtyCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Quantity', prefixIcon: Icon(Icons.numbers_outlined)),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _scanType,
+                      decoration: const InputDecoration(labelText: 'Scan Status'),
+                      items: const [
+                        DropdownMenuItem(value: 'released', child: Text('Released')),
+                        DropdownMenuItem(value: 'returned', child: Text('Returned')),
+                        DropdownMenuItem(value: 'verified', child: Text('Verified')),
+                      ],
+                      onChanged: (v) => setState(() => _scanType = v ?? 'released'),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _locationId?.isNotEmpty == true ? _locationId : null,
+                      decoration: const InputDecoration(labelText: 'Location', prefixIcon: Icon(Icons.location_on_outlined)),
+                      items: _locations.map((l) => DropdownMenuItem<String>(
+                        value: l['id'].toString(),
+                        child: Text(l['name']?.toString() ?? ''),
+                      )).toList(),
+                      onChanged: (v) => setState(() => _locationId = v),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _dateCtrl,
+                      readOnly: true,
+                      decoration: const InputDecoration(labelText: 'Date', prefixIcon: Icon(Icons.calendar_today_outlined)),
+                      onTap: () async {
+                        final now = DateTime.now();
+                        final picked = await showDatePicker(context: context, initialDate: now, firstDate: DateTime(2020), lastDate: DateTime(2100));
+                        if (picked != null && mounted) {
+                          final d = '${picked.year}-${picked.month.toString().padLeft(2,'0')}-${picked.day.toString().padLeft(2,'0')}';
+                          setState(() => _scanDate = d);
+                          _dateCtrl.text = d;
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _timeCtrl,
+                      readOnly: true,
+                      decoration: const InputDecoration(labelText: 'Time', prefixIcon: Icon(Icons.access_time_outlined)),
+                      onTap: () async {
+                        final picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+                        if (picked != null && mounted) {
+                          final t = '${picked.hour.toString().padLeft(2,'0')}:${picked.minute.toString().padLeft(2,'0')}';
+                          setState(() => _scanTime = t);
+                          _timeCtrl.text = t;
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    if (_busy) const LinearProgressIndicator(),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _busy ? null : _resetForm,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: muted,
+                              side: const BorderSide(color: Color(0xffdbe3ef)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: FilledButton(
+                            onPressed: _busy ? null : _save,
+                            child: const Text('Save tracking record'),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                  onChanged: (v) => setState(() => _scanType = v ?? 'released'),
-                ),
-                const SizedBox(height: 12),
-
-                // Location
-                DropdownButtonFormField<String>(
-                  initialValue: _locationId.isEmpty ? null : _locationId,
-                  decoration: const InputDecoration(labelText: 'Location'),
-                  items: _locations.map((l) => DropdownMenuItem<String>(
-                    value: l['id'].toString(),
-                    child: Text(l['name']?.toString() ?? ''),
-                  )).toList(),
-                  onChanged: (v) => setState(() => _locationId = v ?? ''),
-                ),
-                const SizedBox(height: 12),
-
-                // Date
-                TextField(
-                  controller: _scanDateCtrl,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Date',
-                    suffixIcon: Icon(Icons.calendar_today_outlined),
-                  ),
-                  onTap: () async {
-                    final now = DateTime.now();
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: now,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null && mounted) {
-                      setState(() {
-                        _scanDate = '${picked.year}-'
-                            '${picked.month.toString().padLeft(2, '0')}-'
-                            '${picked.day.toString().padLeft(2, '0')}';
-                      });
-                      _scanDateCtrl.text = _scanDate;
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Time
-                TextField(
-                  controller: _scanTimeCtrl,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Time',
-                    suffixIcon: Icon(Icons.access_time_outlined),
-                  ),
-                  onTap: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.now(),
-                    );
-                    if (picked != null && mounted) {
-                      setState(() {
-                        _scanTime = '${picked.hour.toString().padLeft(2, '0')}:'
-                            '${picked.minute.toString().padLeft(2, '0')}';
-                      });
-                      _scanTimeCtrl.text = _scanTime;
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                FilledButton(
-                  onPressed: busy ? null : save,
-                  child: const Text('Save tracking record'),
-                ),
-              ],
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadField extends StatelessWidget {
+  const _ReadField({required this.label, required this.controller, this.icon});
+  final String label;
+  final TextEditingController controller;
+  final IconData? icon;
+  @override
+  Widget build(BuildContext context) => TextField(
+        controller: controller,
+        readOnly: true,
+        style: const TextStyle(fontWeight: FontWeight.w600, color: ink),
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+          filled: true,
+          fillColor: const Color(0xfff8fafc),
+        ),
+      );
+}
+
+// ─── Message Page (Chat Bubbles) ──────────────────────────────────────────────
+
+class MessagePage extends StatefulWidget {
+  const MessagePage({super.key});
+  @override
+  State<MessagePage> createState() => _MessagePageState();
+}
+
+class _MessagePageState extends State<MessagePage> {
+  List<Map<String, dynamic>> _messages = [];
+  Map<String, dynamic>? _me;
+  final _msgCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
+  Timer? _timer;
+  bool _sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMe().then((_) => _loadMessages());
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _loadMessages());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _msgCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMe() async {
+    try {
+      final result = await Api.req('GET', '/me');
+      if (mounted) setState(() => _me = result['user'] as Map<String, dynamic>?);
+    } catch (_) {}
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final result = await Api.req('GET', '/messages');
+      final list = result['messages'] as List? ?? [];
+      if (mounted) {
+        setState(() => _messages = list.map((e) => e as Map<String, dynamic>).toList());
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollCtrl.hasClients) {
+            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _send() async {
+    final text = _msgCtrl.text.trim();
+    if (text.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    try {
+      await Api.req('POST', '/messages', body: {'message': text});
+      _msgCtrl.clear();
+      await _loadMessages();
+    } catch (_) {} finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  String _formatTime(String? iso) {
+    if (iso == null) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final m = dt.minute.toString().padLeft(2, '0');
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      return '$h:$m $ampm';
+    } catch (_) { return ''; }
+  }
+
+  String _formatDate(String? iso) {
+    if (iso == null) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final yesterday = today.subtract(const Duration(days: 1));
+      final day = DateTime(dt.year, dt.month, dt.day);
+      if (day == today) return 'Today';
+      if (day == yesterday) return 'Yesterday';
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (_) { return ''; }
+  }
+
+  List<Map<String, dynamic>> _groupByDate() {
+    final groups = <Map<String, dynamic>>[];
+    String lastLabel = '';
+    for (final msg in _messages) {
+      final label = _formatDate(msg['created_at']?.toString());
+      if (label != lastLabel) {
+        groups.add({'type': 'date', 'label': label});
+        lastLabel = label;
+      }
+      groups.add({'type': 'msg', 'data': msg});
+    }
+    return groups;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final myId = _me?['id'];
+    final grouped = _groupByDate();
+
+    return Column(
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: Color(0xffe8edf5))),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(color: const Color(0xffdbeafe), borderRadius: BorderRadius.circular(18)),
+                child: const Icon(Icons.groups_outlined, color: blue, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Admin', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  Text('Direct chat with administration', style: TextStyle(color: muted, fontSize: 11)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // Messages list
+        Expanded(
+          child: _messages.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.chat_bubble_outline, size: 40, color: muted),
+                      SizedBox(height: 8),
+                      Text('No messages yet. Say hello!', style: TextStyle(color: muted, fontSize: 13)),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  controller: _scrollCtrl,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  itemCount: grouped.length,
+                  itemBuilder: (context, i) {
+                    final item = grouped[i];
+                    if (item['type'] == 'date') {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                decoration: BoxDecoration(color: const Color(0xfff1f5f9), borderRadius: BorderRadius.circular(20)),
+                                child: Text(item['label']?.toString() ?? '', style: const TextStyle(fontSize: 11, color: muted)),
+                              ),
+                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                      );
+                    }
+                    final msg = item['data'] as Map<String, dynamic>;
+                    final isSelf = msg['sender_id']?.toString() == myId?.toString();
+                    final senderName = msg['sender']?['name']?.toString();
+                    final text = msg['message']?.toString() ?? '';
+                    final time = _formatTime(msg['created_at']?.toString());
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Column(
+                        crossAxisAlignment: isSelf ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          if (!isSelf && senderName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4, bottom: 2),
+                              child: Text(senderName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: muted)),
+                            ),
+                          Row(
+                            mainAxisAlignment: isSelf ? MainAxisAlignment.end : MainAxisAlignment.start,
+                            children: [
+                              ConstrainedBox(
+                                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: isSelf ? blue : Colors.white,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(18),
+                                      topRight: const Radius.circular(18),
+                                      bottomLeft: Radius.circular(isSelf ? 18 : 4),
+                                      bottomRight: Radius.circular(isSelf ? 4 : 18),
+                                    ),
+                                    border: isSelf ? null : Border.all(color: const Color(0xffe2e8f0)),
+                                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 2))],
+                                  ),
+                                  child: Text(text, style: TextStyle(color: isSelf ? Colors.white : ink, fontSize: 14)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
+                            child: Text(time, style: const TextStyle(fontSize: 10, color: muted)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+        // Compose
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Color(0xffe8edf5))),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _msgCtrl,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    hintText: 'Write a message to admin\u2026',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                  onSubmitted: (_) => _send(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _sending ? null : _send,
+                icon: _sending
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.send_rounded, color: blue),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xffeff6ff),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 }
-class ResourcePage extends StatelessWidget { const ResourcePage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/resources', listKey: 'resources', title: 'Resources', subtitle: 'Relief supply inventory', kind: 'resource'); }
-class DistributionPage extends StatelessWidget { const DistributionPage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/distributions/history', listKey: 'distributions', title: 'Distribution', subtitle: 'Current relief distribution and history', kind: 'distribution'); }
-class FamilyListPage extends StatelessWidget { const FamilyListPage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/staff/families', listKey: 'families', title: 'Families', subtitle: 'Households in your assigned Purok', kind: 'family'); }
-class ScanHistoryPage extends StatelessWidget { const ScanHistoryPage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/qr/scans', listKey: 'scans', title: 'QR Scan History', subtitle: 'Recent tracking activity', kind: 'scan'); }
-class LocationPage extends StatelessWidget { const LocationPage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/locations', listKey: 'locations', title: 'Locations', subtitle: 'Relief storage and distribution locations', kind: 'location'); }
-class ReportPage extends StatelessWidget { const ReportPage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/reports', listKey: 'reports', title: 'Reports', subtitle: 'Relief operation reports', kind: 'report'); }
-class MessagePage extends StatelessWidget { const MessagePage({super.key}); @override Widget build(BuildContext context) => const _ApiListPage(path: '/messages', listKey: 'messages', title: 'Messages', subtitle: 'Messages and announcements', kind: 'message'); }
+
+// ─── Resource Page ────────────────────────────────────────────────────────────
+
+class ResourcePage extends StatefulWidget {
+  const ResourcePage({super.key});
+  @override
+  State<ResourcePage> createState() => _ResourcePageState();
+}
+
+class _ResourcePageState extends State<ResourcePage> {
+  List<Map<String, dynamic>> _resources = [];
+  Map<String, dynamic>? _meUser;
+  String _search = '';
+  String? _selectedCategory;
+  String? _selectedDisaster;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final results = await Future.wait([
+        Api.req('GET', '/resources'),
+        Api.req('GET', '/me'),
+      ]);
+      final raw = results[0]['resources'] as List? ?? [];
+      final user = results[1]['user'] as Map<String, dynamic>?;
+      if (mounted) {
+        setState(() {
+          _resources = raw.map((e) => e as Map<String, dynamic>).toList();
+          _meUser = user;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    final myLocId = _meUser?['location_id']?.toString();
+    return _resources.where((r) {
+      final locId = r['location_id']?.toString() ?? r['location']?['id']?.toString();
+      if (myLocId != null && myLocId.isNotEmpty && locId != null && locId != myLocId) return false;
+      if (_selectedCategory != null && r['category']?.toString() != _selectedCategory) return false;
+      if (_selectedDisaster != null && r['disaster']?.toString() != _selectedDisaster) return false;
+      if (_search.isNotEmpty) {
+        final hay = '${r['name']} ${r['category']} ${r['location']?['name']}'.toLowerCase();
+        if (!hay.contains(_search.toLowerCase())) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  List<String> get _categories {
+    final cats = _resources.map((r) => r['category']?.toString() ?? '').where((c) => c.isNotEmpty).toSet().toList();
+    cats.sort();
+    return cats;
+  }
+
+  List<String> get _disasters {
+    final d = _resources.map((r) => r['disaster']?.toString() ?? '').where((c) => c.isNotEmpty).toSet().toList();
+    d.sort();
+    return d;
+  }
+
+  Color _statusColor(String? status) {
+    final s = status?.toLowerCase() ?? '';
+    if (s.contains('available') || s.contains('in_stock') || s.contains('active')) return const Color(0xff059669);
+    if (s.contains('low') || s.contains('critical')) return const Color(0xffdc2626);
+    return muted;
+  }
+
+  void _showDetail(Map<String, dynamic> r) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.95,
+        builder: (_, ctrl) => ListView(
+          controller: ctrl,
+          padding: const EdgeInsets.all(20),
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffe2e8f0), borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            Text(r['name']?.toString() ?? 'Resource', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
+            const SizedBox(height: 12),
+            _DetailRow('Category', r['category']?.toString()),
+            _DetailRow('Quantity', '${r['quantity'] ?? ''} ${r['unit'] ?? ''}'),
+            _DetailRow('Status', r['status']?.toString()),
+            _DetailRow('Location', r['location']?['name']?.toString()),
+            _DetailRow('Disaster', r['disaster']?.toString()),
+            _DetailRow('Description', r['description']?.toString()),
+            _DetailRow('Min Threshold', r['minimum_threshold']?.toString()),
+            if ((r['qr_code']?.toString() ?? '').isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('QR Code', style: TextStyle(fontSize: 12, color: muted)),
+              const SizedBox(height: 4),
+              SelectableText(r['qr_code'].toString(), style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filtered;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Column(
+            children: [
+              TextField(
+                onChanged: (v) => setState(() => _search = v),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search resources...'),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedCategory,
+                      decoration: const InputDecoration(labelText: 'Category', contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('All')),
+                        ..._categories.map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis))),
+                      ],
+                      onChanged: (v) => setState(() => _selectedCategory = v),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedDisaster,
+                      decoration: const InputDecoration(labelText: 'Disaster', contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('All')),
+                        ..._disasters.map((d) => DropdownMenuItem(value: d, child: Text(d, overflow: TextOverflow.ellipsis))),
+                      ],
+                      onChanged: (v) => setState(() => _selectedDisaster = v),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (_loading) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
+        if (_error != null) Padding(padding: const EdgeInsets.all(16), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: filtered.isEmpty && !_loading
+                ? const Center(child: Text('No resources found.', style: TextStyle(color: muted)))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final r = filtered[i];
+                      final status = r['status']?.toString() ?? '';
+                      final statusColor = _statusColor(status);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: GestureDetector(
+                          onTap: () => _showDetail(r),
+                          child: Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 44, height: 44,
+                                    decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(13)),
+                                    child: const Icon(Icons.inventory_2_outlined, color: blue),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(r['name']?.toString() ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            if ((r['category']?.toString() ?? '').isNotEmpty)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(8)),
+                                                child: Text(r['category'].toString(), style: const TextStyle(fontSize: 11, color: blue)),
+                                              ),
+                                            const SizedBox(width: 6),
+                                            Text('${r['quantity'] ?? ''} ${r['unit'] ?? ''}', style: const TextStyle(fontSize: 12, color: muted)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        if ((r['location']?['name']?.toString() ?? '').isNotEmpty)
+                                          Text(r['location']['name'].toString(), style: const TextStyle(fontSize: 11, color: muted)),
+                                        if (status.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                                              child: Text(status, style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right, color: Color(0xff94a3b8)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow(this.label, this.value);
+  final String label;
+  final String? value;
+  @override
+  Widget build(BuildContext context) {
+    if (value == null || value!.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 130, child: Text(label, style: const TextStyle(fontSize: 12, color: muted))),
+          Expanded(child: Text(value!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ink))),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Distribution Page ────────────────────────────────────────────────────────
+
+class DistributionPage extends StatefulWidget {
+  const DistributionPage({super.key});
+  @override
+  State<DistributionPage> createState() => _DistributionPageState();
+}
+
+class _DistributionPageState extends State<DistributionPage> {
+  List<Map<String, dynamic>> _distributions = [];
+  String _search = '';
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final result = await Api.req('GET', '/distributions/history');
+      final raw = result['distributions'] as List? ?? [];
+      if (mounted) setState(() { _distributions = raw.map((e) => e as Map<String, dynamic>).toList(); _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (_search.isEmpty) return _distributions;
+    return _distributions.where((d) {
+      final hay = '${d['family']?['family_name'] ?? d['family_name'] ?? ''} ${d['family_id'] ?? ''} ${d['status'] ?? ''}'.toLowerCase();
+      return hay.contains(_search.toLowerCase());
+    }).toList();
+  }
+
+  Color _statusColor(String? s) {
+    final v = s?.toLowerCase() ?? '';
+    if (v == 'completed') return const Color(0xff059669);
+    if (v == 'cancelled' || v == 'canceled') return const Color(0xffdc2626);
+    if (v == 'pending') return const Color(0xfff59e0b);
+    return muted;
+  }
+
+  void _showDetail(Map<String, dynamic> d) {
+    final family = d['family'] as Map? ?? {};
+    final purok  = family['purok']?['name'] ?? d['purok']?['name'] ?? '';
+    final loc    = family['location']?['name'] ?? d['location']?['name'] ?? '';
+    final resource = d['resource'] as Map? ?? {};
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.65,
+        maxChildSize: 0.95,
+        builder: (_, ctrl) => ListView(
+          controller: ctrl,
+          padding: const EdgeInsets.all(20),
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffe2e8f0), borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            const Text('Distribution Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
+            const SizedBox(height: 12),
+            _DetailRow('Distribution ID', d['id']?.toString()),
+            _DetailRow('Family ID', family['family_id']?.toString() ?? d['family_id']?.toString()),
+            _DetailRow('Family Name', family['family_name']?.toString() ?? d['family_name']?.toString()),
+            _DetailRow('Family Head', family['head_name']?.toString() ?? d['head_name']?.toString()),
+            _DetailRow('Location', loc.isNotEmpty ? '$purok, $loc' : purok),
+            _DetailRow('Relief', resource['name']?.toString() ?? d['resource_name']?.toString()),
+            _DetailRow('Additional Items', d['additional_items']?.toString()),
+            _DetailRow('Qty', d['quantity']?.toString()),
+            _DetailRow('Scanned By', d['distributor']?['name']?.toString() ?? d['scanned_by']?.toString()),
+            _DetailRow('Status', d['status']?.toString()),
+            _DetailRow('Disaster', d['disaster']?.toString()),
+            _DetailRow('Reason', d['reason']?.toString()),
+            _DetailRow('Date', d['distribution_date']?.toString() ?? d['scheduled_at']?.toString()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filtered;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: TextField(
+            onChanged: (v) => setState(() => _search = v),
+            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search distributions...'),
+          ),
+        ),
+        if (_loading) const Center(child: CircularProgressIndicator()),
+        if (_error != null) Padding(padding: const EdgeInsets.all(16), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: filtered.isEmpty && !_loading
+                ? const Center(child: Text('No distributions found.', style: TextStyle(color: muted)))
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final d = filtered[i];
+                      final family = d['family'] as Map? ?? {};
+                      final name = family['family_name']?.toString() ?? d['family_name']?.toString() ?? d['recipient_name']?.toString() ?? 'Distribution';
+                      final resource = d['resource'] as Map? ?? {};
+                      final resName = resource['name']?.toString() ?? d['resource_name']?.toString() ?? '';
+                      final status = d['status']?.toString() ?? '';
+                      final date = d['distribution_date']?.toString() ?? d['scheduled_at']?.toString() ?? '';
+                      final statusColor = _statusColor(status);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: GestureDetector(
+                          onTap: () => _showDetail(d),
+                          child: Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 44, height: 44,
+                                    decoration: BoxDecoration(color: const Color(0xfff0fdfa), borderRadius: BorderRadius.circular(13)),
+                                    child: const Icon(Icons.local_shipping_outlined, color: Color(0xff0d9488)),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                                        if (resName.isNotEmpty) Text(resName, style: const TextStyle(fontSize: 12, color: muted)),
+                                        if (date.isNotEmpty) Text(date, style: const TextStyle(fontSize: 11, color: muted)),
+                                        if (status.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                                              child: Text(status, style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right, color: Color(0xff94a3b8)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Location Page ────────────────────────────────────────────────────────────
+
+class LocationPage extends StatefulWidget {
+  const LocationPage({super.key});
+  @override
+  State<LocationPage> createState() => _LocationPageState();
+}
+
+class _LocationPageState extends State<LocationPage> {
+  List<Map<String, dynamic>> _locations = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final results = await Future.wait([
+        Api.req('GET', '/locations'),
+        Api.req('GET', '/me'),
+      ]);
+      final raw = results[0]['locations'] as List? ?? [];
+      final user = results[1]['user'] as Map<String, dynamic>?;
+      if (mounted) {
+        setState(() {
+          final myLocId = user?['location_id']?.toString();
+          final all = raw.map((e) => e as Map<String, dynamic>).toList();
+          _locations = myLocId != null && myLocId.isNotEmpty
+              ? all.where((l) => l['id']?.toString() == myLocId).toList()
+              : all;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  Color _statusColor(String? s) {
+    final v = s?.toLowerCase() ?? '';
+    if (v == 'active') return const Color(0xff059669);
+    if (v == 'inactive' || v == 'closed') return const Color(0xffdc2626);
+    return muted;
+  }
+
+  void _showDetail(Map<String, dynamic> l) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        maxChildSize: 0.9,
+        builder: (_, ctrl) => ListView(
+          controller: ctrl,
+          padding: const EdgeInsets.all(20),
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffe2e8f0), borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            Text(l['name']?.toString() ?? 'Location', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
+            const SizedBox(height: 12),
+            _DetailRow('Type', l['type']?.toString()),
+            _DetailRow('Address', l['address']?.toString()),
+            _DetailRow('Barangay', l['barangay']?.toString() ?? l['city']?.toString()),
+            _DetailRow('Capacity', l['capacity']?.toString()),
+            _DetailRow('Contact Person', l['contact_person']?.toString()),
+            _DetailRow('Contact Phone', l['contact_phone']?.toString()),
+            _DetailRow('Email', l['email']?.toString()),
+            _DetailRow('Status', l['status']?.toString()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (_loading) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
+        if (_error != null) Padding(padding: const EdgeInsets.all(16), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: _locations.isEmpty && !_loading
+                ? const Center(child: Text('No locations assigned.', style: TextStyle(color: muted)))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _locations.length,
+                    itemBuilder: (_, i) {
+                      final l = _locations[i];
+                      final status = l['status']?.toString() ?? '';
+                      final statusColor = _statusColor(status);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: GestureDetector(
+                          onTap: () => _showDetail(l),
+                          child: Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 44, height: 44,
+                                    decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(13)),
+                                    child: const Icon(Icons.location_on_outlined, color: blue),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(l['name']?.toString() ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                                        if ((l['type']?.toString() ?? '').isNotEmpty) Text(l['type'].toString(), style: const TextStyle(fontSize: 12, color: muted)),
+                                        if (status.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                                              child: Text(status, style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right, color: Color(0xff94a3b8)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Report Page ──────────────────────────────────────────────────────────────
+
+class ReportPage extends StatefulWidget {
+  const ReportPage({super.key});
+  @override
+  State<ReportPage> createState() => _ReportPageState();
+}
+
+class _ReportPageState extends State<ReportPage> {
+  Map<String, dynamic> _summary = {};
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final result = await Api.req('GET', '/reports');
+      final s = result['summary'] as Map<String, dynamic>? ?? result;
+      if (mounted) setState(() { _summary = s; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  int _val(String key) {
+    final v = _summary[key];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v?.toString() ?? '0') ?? 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) { return const Center(child: CircularProgressIndicator()); }
+    if (_error != null) {
+      return Center(child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_off_outlined, size: 40, color: muted),
+          const SizedBox(height: 10),
+          Text(_error!, style: const TextStyle(color: muted, fontSize: 13), textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          FilledButton(onPressed: _load, child: const Text('Try again')),
+        ],
+      ));
+    }
+
+    final stats = [
+      {'label': 'Total Resources',    'value': _val('total_resources'),    'icon': Icons.inventory_2_outlined,       'color': blue,                    'tint': const Color(0xffeff6ff)},
+      {'label': 'Total Families',     'value': _val('total_families'),     'icon': Icons.groups_outlined,            'color': const Color(0xff4f46e5), 'tint': const Color(0xffeef2ff)},
+      {'label': 'Total Distributions','value': _val('total_distributions'), 'icon': Icons.local_shipping_outlined,    'color': const Color(0xff0d9488), 'tint': const Color(0xfff0fdfa)},
+      {'label': 'QR Scans',           'value': _val('total_scans'),        'icon': Icons.qr_code_2_rounded,          'color': const Color(0xffa855f7), 'tint': const Color(0xfffaf5ff)},
+      {'label': 'Households Served',  'value': _val('household_member_served'), 'icon': Icons.volunteer_activism_outlined, 'color': const Color(0xff059669), 'tint': const Color(0xffecfdf5)},
+      {'label': 'Low Stock Items',    'value': _val('low_stock_count'),    'icon': Icons.warning_amber_rounded,      'color': const Color(0xffdc2626), 'tint': const Color(0xfffff1f2)},
+    ];
+
+    final maxVal = stats.fold<int>(1, (m, s) => (s['value'] as int) > m ? (s['value'] as int) : m);
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text('Relief Operation Reports', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
+          const SizedBox(height: 4),
+          const Text('Summary statistics for your assigned location', style: TextStyle(color: muted, fontSize: 13)),
+          const SizedBox(height: 16),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.35,
+            children: stats.map((s) => Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: s['tint'] as Color, borderRadius: BorderRadius.circular(11)),
+                      child: Icon(s['icon'] as IconData, color: s['color'] as Color, size: 20),
+                    ),
+                    Text('${s['value']}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: ink, height: 1.1)),
+                    Text(s['label'] as String, style: const TextStyle(fontSize: 11, color: muted), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+            )).toList(),
+          ),
+          const SizedBox(height: 20),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Summary Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 14),
+                  ...stats.map((s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(s['label'] as String, style: const TextStyle(fontSize: 12, color: muted)),
+                            Text('${s['value']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ink)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: maxVal > 0 ? (s['value'] as int) / maxVal : 0.0,
+                            backgroundColor: const Color(0xfff1f5f9),
+                            color: s['color'] as Color,
+                            minHeight: 6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Family List Page ─────────────────────────────────────────────────────────
+
+class FamilyListPage extends StatefulWidget {
+  const FamilyListPage({super.key});
+  @override
+  State<FamilyListPage> createState() => _FamilyListPageState();
+}
+
+class _FamilyListPageState extends State<FamilyListPage> {
+  List<Map<String, dynamic>> _families = [];
+  String _search = '';
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final result = await Api.req('GET', '/staff/families');
+      final raw = result['families'] as List? ?? [];
+      if (mounted) setState(() { _families = raw.map((e) => e as Map<String, dynamic>).toList(); _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (_search.isEmpty) return _families;
+    return _families.where((f) {
+      final hay = '${f['family_name']} ${f['head_name']} ${f['family_id']}'.toLowerCase();
+      return hay.contains(_search.toLowerCase());
+    }).toList();
+  }
+
+  void _showDetail(Map<String, dynamic> f) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.95,
+        builder: (_, ctrl) => ListView(
+          controller: ctrl,
+          padding: const EdgeInsets.all(20),
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffe2e8f0), borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            Text(f['family_name']?.toString() ?? 'Family', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
+            const SizedBox(height: 12),
+            _DetailRow('Family', f['family_name']?.toString()),
+            _DetailRow('Head of Family', f['head_name']?.toString()),
+            _DetailRow('Phone', f['phone']?.toString()),
+            _DetailRow('Household Members', f['household_member']?.toString() ?? f['members_count']?.toString()),
+            _DetailRow('Purok', (f['purok'] is Map) ? f['purok']['name']?.toString() : f['purok']?.toString()),
+            _DetailRow('Location', (f['location'] is Map) ? f['location']['name']?.toString() : f['location']?.toString()),
+            _DetailRow('Status', f['status']?.toString()),
+            _DetailRow('Family ID', f['family_id']?.toString()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filtered;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: TextField(
+            onChanged: (v) => setState(() => _search = v),
+            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search families...'),
+          ),
+        ),
+        if (_loading) const Center(child: CircularProgressIndicator()),
+        if (_error != null) Padding(padding: const EdgeInsets.all(16), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: filtered.isEmpty && !_loading
+                ? const Center(child: Text('No families found.', style: TextStyle(color: muted)))
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final f = filtered[i];
+                      final purok = (f['purok'] is Map) ? f['purok']['name']?.toString() ?? '' : f['purok']?.toString() ?? '';
+                      final members = f['household_member']?.toString() ?? f['members_count']?.toString() ?? '';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: GestureDetector(
+                          onTap: () => _showDetail(f),
+                          child: Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 44, height: 44,
+                                    decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(13)),
+                                    child: const Icon(Icons.groups_outlined, color: blue),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(f['family_name']?.toString() ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                                        if ((f['head_name']?.toString() ?? '').isNotEmpty)
+                                          Text(f['head_name'].toString(), style: const TextStyle(fontSize: 12, color: muted)),
+                                        Row(children: [
+                                          if (purok.isNotEmpty) Text(purok, style: const TextStyle(fontSize: 11, color: muted)),
+                                          if (purok.isNotEmpty && members.isNotEmpty) const Text(' \u2022 ', style: TextStyle(color: muted, fontSize: 11)),
+                                          if (members.isNotEmpty) Text('$members members', style: const TextStyle(fontSize: 11, color: muted)),
+                                        ]),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right, color: Color(0xff94a3b8)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Profile Page ─────────────────────────────────────────────────────────────
+
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  Map<String, dynamic>? _user;
+  bool _editing = false;
+  bool _busy = false;
+  String? _error;
+  final _nameCtrl  = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose(); _emailCtrl.dispose(); _phoneCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final result = await Api.req('GET', '/me');
+      final user = result['user'] as Map<String, dynamic>?;
+      if (mounted && user != null) {
+        setState(() {
+          _user = user;
+          _nameCtrl.text  = user['name']?.toString() ?? '';
+          _emailCtrl.text = user['email']?.toString() ?? '';
+          _phoneCtrl.text = user['phone']?.toString() ?? '';
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _save() async {
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isNotEmpty && !RegExp(r'^09\d{9}$').hasMatch(phone)) {
+      setState(() => _error = 'Phone must start with 09 and be 11 digits.');
+      return;
+    }
+    setState(() { _busy = true; _error = null; });
+    try {
+      final result = await Api.patch('/profile', body: {
+        'name':  _nameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim(),
+        'phone': phone.isEmpty ? null : phone,
+      });
+      if (mounted) {
+        setState(() {
+          _user = result['user'] as Map<String, dynamic>? ?? _user;
+          _editing = false;
+          _busy = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated.')));
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _busy = false; });
+    }
+  }
+
+  Future<void> _pickAvatar() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
+      setState(() => _busy = true);
+      final result = await Api.uploadFile('/profile/avatar', 'avatar', picked.path);
+      if (mounted) {
+        final avatarUrl = result['avatar_url']?.toString();
+        setState(() {
+          if (_user != null && avatarUrl != null) _user!['avatar'] = avatarUrl;
+          _busy = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo updated.')));
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _busy = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = _user;
+    final locationName = (user?['location'] is Map) ? user!['location']['name']?.toString() ?? '' : '';
+    final purokName    = (user?['purok'] is Map)    ? user!['purok']['name']?.toString() ?? ''    : '';
+    final avatarUrl    = user?['avatar']?.toString();
+    final staffId      = user?['id']?.toString() ?? '';
+    final initials     = (user?['name']?.toString() ?? 'S').substring(0, 1).toUpperCase();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [
+          TextButton(
+            onPressed: () => setState(() { _editing = !_editing; _error = null; }),
+            child: Text(_editing ? 'Cancel' : 'Edit', style: const TextStyle(color: blue)),
+          ),
+        ],
+      ),
+      body: user == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                // Avatar
+                Center(
+                  child: GestureDetector(
+                    onTap: _editing ? _pickAvatar : null,
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 48,
+                          backgroundColor: const Color(0xffdbeafe),
+                          backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
+                          child: (avatarUrl == null || avatarUrl.isEmpty)
+                              ? Text(initials, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: blue))
+                              : null,
+                        ),
+                        if (_editing)
+                          Positioned(
+                            bottom: 0, right: 0,
+                            child: Container(
+                              width: 28, height: 28,
+                              decoration: const BoxDecoration(color: blue, shape: BoxShape.circle),
+                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Center(child: Text(user['name']?.toString() ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: ink))),
+                if (staffId.isNotEmpty)
+                  Center(child: Text('STAFF-$staffId', style: const TextStyle(fontSize: 13, color: muted))),
+                const SizedBox(height: 20),
+                if (_error != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: const Color(0xfffff1f2), borderRadius: BorderRadius.circular(10)),
+                    child: Text(_error!, style: const TextStyle(color: Color(0xffdc2626), fontSize: 13)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Account Information', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 14),
+                        if (_editing) ...[
+                          const _FieldLabel('Name'),
+                          const SizedBox(height: 6),
+                          TextField(controller: _nameCtrl),
+                          const SizedBox(height: 14),
+                          const _FieldLabel('Email'),
+                          const SizedBox(height: 6),
+                          TextField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress),
+                          const SizedBox(height: 14),
+                          const _FieldLabel('Phone (start with 09, 11 digits)'),
+                          const SizedBox(height: 6),
+                          TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, maxLength: 11,
+                              decoration: const InputDecoration(counterText: '')),
+                          const SizedBox(height: 18),
+                          FilledButton(
+                            onPressed: _busy ? null : _save,
+                            child: _busy
+                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Text('Save changes'),
+                          ),
+                        ] else ...[
+                          _DetailRow('Name', user['name']?.toString()),
+                          _DetailRow('Email', user['email']?.toString()),
+                          _DetailRow('Phone', user['phone']?.toString()),
+                          _DetailRow('Role', user['role']?.toString()),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Assignment', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 14),
+                        _DetailRow('Barangay / Location', locationName.isNotEmpty ? locationName : 'Not assigned'),
+                        _DetailRow('Purok', purokName.isNotEmpty ? purokName : 'Not assigned'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+// ─── Scan History Page (uses _ApiListPage — kept intact) ─────────────────────
+
+class ScanHistoryPage extends StatelessWidget {
+  const ScanHistoryPage({super.key});
+  @override
+  Widget build(BuildContext context) => const _ApiListPage(
+        path: '/qr/scans',
+        listKey: 'scans',
+        title: 'QR Scan History',
+        subtitle: 'Recent tracking activity',
+        kind: 'scan',
+      );
+}
+
+// ─── _ApiListPage (kept intact for ScanHistoryPage) ──────────────────────────
 
 class _ApiListPage extends StatefulWidget {
   const _ApiListPage({
@@ -1828,20 +3081,13 @@ class _ApiListPageState extends State<_ApiListPage> {
 
   IconData get icon {
     switch (widget.kind) {
-      case 'resource':
-        return Icons.inventory_2_outlined;
-      case 'distribution':
-        return Icons.local_shipping_outlined;
-      case 'family':
-        return Icons.groups_outlined;
-      case 'scan':
-        return Icons.qr_code_2;
-      case 'location':
-        return Icons.location_on_outlined;
-      case 'report':
-        return Icons.description_outlined;
-      default:
-        return Icons.chat_bubble_outline;
+      case 'resource':     return Icons.inventory_2_outlined;
+      case 'distribution': return Icons.local_shipping_outlined;
+      case 'family':       return Icons.groups_outlined;
+      case 'scan':         return Icons.qr_code_2;
+      case 'location':     return Icons.location_on_outlined;
+      case 'report':       return Icons.description_outlined;
+      default:             return Icons.chat_bubble_outline;
     }
   }
 
@@ -1879,9 +3125,7 @@ class _ApiListPageState extends State<_ApiListPage> {
           row['family_id'],
           row['head_name'] ?? row['family_head'],
           row['purok']?['name'] ?? row['purok_name'],
-          row['members_count'] == null
-              ? null
-              : '${row['members_count']} household members',
+          row['members_count'] == null ? null : '${row['members_count']} household members',
         ],
       'scan' => [
           row['family']?['family_name'],
@@ -1893,14 +3137,14 @@ class _ApiListPageState extends State<_ApiListPage> {
           row['scanned_at'] ?? row['created_at'],
         ],
       'location' => [row['address'], row['purok'], row['type'], row['status']],
-      'report' => [row['description'], row['created_at'] ?? row['date']],
-      _ => [row['body'] ?? row['message'], row['created_at'], row['status']],
+      'report'   => [row['description'], row['created_at'] ?? row['date']],
+      _          => [row['body'] ?? row['message'], row['created_at'], row['status']],
     };
 
     return fields
         .where((value) => value != null && value.toString().trim().isNotEmpty)
         .map((value) => value.toString())
-        .join(' â€¢ ');
+        .join(' \u2022 ');
   }
 
   @override
@@ -1916,11 +3160,7 @@ class _ApiListPageState extends State<_ApiListPage> {
         }).toList();
 
         return RefreshIndicator(
-          onRefresh: () async {
-            setState(() {
-              future = Api.req('GET', widget.path);
-            });
-          },
+          onRefresh: () async => setState(() => future = Api.req('GET', widget.path)),
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -1935,10 +3175,7 @@ class _ApiListPageState extends State<_ApiListPage> {
               ),
               const SizedBox(height: 14),
               if (snapshot.connectionState == ConnectionState.waiting)
-                const Padding(
-                  padding: EdgeInsets.all(28),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
+                const Padding(padding: EdgeInsets.all(28), child: Center(child: CircularProgressIndicator())),
               if (snapshot.hasError)
                 Card(
                   child: Padding(
@@ -1947,54 +3184,35 @@ class _ApiListPageState extends State<_ApiListPage> {
                       children: [
                         const Icon(Icons.cloud_off_outlined, size: 36, color: muted),
                         const SizedBox(height: 10),
-                        Text(
-                          'Could not load ${widget.title.toLowerCase()}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                        Text('Could not load ${widget.title.toLowerCase()}', style: const TextStyle(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 6),
-                        Text(
-                          snapshot.error.toString().replaceFirst('Exception: ', ''),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: muted, fontSize: 12),
-                        ),
+                        Text(snapshot.error.toString().replaceFirst('Exception: ', ''),
+                            textAlign: TextAlign.center, style: const TextStyle(color: muted, fontSize: 12)),
                         const SizedBox(height: 12),
                         OutlinedButton(
-                          onPressed: () => setState(() {
-                            future = Api.req('GET', widget.path);
-                          }),
+                          onPressed: () => setState(() => future = Api.req('GET', widget.path)),
                           child: const Text('Try again'),
                         ),
                       ],
                     ),
                   ),
                 ),
-              if (!snapshot.hasError &&
-                  snapshot.connectionState == ConnectionState.done &&
-                  rows.isEmpty)
+              if (!snapshot.hasError && snapshot.connectionState == ConnectionState.done && rows.isEmpty)
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(26),
                     child: Column(
                       children: [
                         Container(
-                          width: 54,
-                          height: 54,
-                          decoration: BoxDecoration(
-                            color: const Color(0xffeff6ff),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
+                          width: 54, height: 54,
+                          decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(16)),
                           child: Icon(icon, color: blue, size: 27),
                         ),
                         const SizedBox(height: 12),
-                        Text(
-                          search.isEmpty ? 'No ${widget.title.toLowerCase()} found' : 'No matching results',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                        Text(search.isEmpty ? 'No ${widget.title.toLowerCase()} found' : 'No matching results',
+                            style: const TextStyle(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 5),
-                        const Text(
-                          'Pull down to refresh the list.',
-                          style: TextStyle(color: muted, fontSize: 12),
-                        ),
+                        const Text('Pull down to refresh the list.', style: TextStyle(color: muted, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -2003,7 +3221,6 @@ class _ApiListPageState extends State<_ApiListPage> {
                 final row = item as Map<String, dynamic>;
                 final sub = _subtitle(row);
                 final status = row['status']?.toString();
-
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Card(
@@ -2013,12 +3230,8 @@ class _ApiListPageState extends State<_ApiListPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: const Color(0xffeff6ff),
-                              borderRadius: BorderRadius.circular(13),
-                            ),
+                            width: 42, height: 42,
+                            decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(13)),
                             child: Icon(icon, color: blue),
                           ),
                           const SizedBox(width: 12),
@@ -2026,24 +3239,11 @@ class _ApiListPageState extends State<_ApiListPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  _title(row),
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
+                                Text(_title(row), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                                 if (sub.isNotEmpty)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 5),
-                                    child: Text(
-                                      sub,
-                                      style: const TextStyle(
-                                        color: muted,
-                                        fontSize: 12,
-                                        height: 1.4,
-                                      ),
-                                    ),
+                                    child: Text(sub, style: const TextStyle(color: muted, fontSize: 12, height: 1.4)),
                                   ),
                                 if (status != null && status.isNotEmpty)
                                   Padding(
@@ -2071,15 +3271,12 @@ class _ApiListPageState extends State<_ApiListPage> {
 
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.status});
-
   final String status;
 
   @override
   Widget build(BuildContext context) {
     final lowercase = status.toLowerCase();
-    final color = lowercase.contains('complete') ||
-            lowercase.contains('available') ||
-            lowercase.contains('stock')
+    final color = lowercase.contains('complete') || lowercase.contains('available') || lowercase.contains('stock')
         ? const Color(0xff059669)
         : lowercase.contains('cancel') || lowercase.contains('low')
             ? const Color(0xffdc2626)
@@ -2093,15 +3290,8 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(
         status,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
       ),
     );
   }
 }
-
-
-

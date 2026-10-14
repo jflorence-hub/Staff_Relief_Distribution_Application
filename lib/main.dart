@@ -78,44 +78,85 @@ class _AppLogo extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          width: 76,
-          height: 76,
+          width: 90,
+          height: 90,
           decoration: BoxDecoration(
-            color: blue,
-            borderRadius: BorderRadius.circular(22),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xff1d4ed8), Color(0xff2563eb), Color(0xff1e40af)],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xff2563eb).withValues(alpha: 0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Stack(
             alignment: Alignment.center,
             children: [
+              // Shield background
               Positioned(
-                bottom: 8,
+                top: 6,
                 child: Icon(
-                  Icons.people_alt_rounded,
-                  color: Colors.white.withValues(alpha: 0.45),
-                  size: 36,
+                  Icons.shield_outlined,
+                  color: Colors.white.withValues(alpha: 0.25),
+                  size: 70,
                 ),
               ),
-              const Text(
-                'DR',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 22,
-                  letterSpacing: 1,
-                ),
+              // Main relief worker icon
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.medical_services_outlined,
+                          color: Colors.white, size: 22),
+                      const SizedBox(width: 4),
+                      Icon(Icons.assignment_outlined,
+                          color: Colors.white.withValues(alpha: 0.9), size: 20),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  const Icon(Icons.person_outlined, color: Colors.white, size: 26),
+                ],
               ),
             ],
           ),
         ),
         const SizedBox(height: 14),
         const Text(
-          'Disaster Relief',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: ink),
+          'Staff Disaster Relief',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: ink,
+            letterSpacing: -0.5,
+          ),
         ),
-        const SizedBox(height: 3),
-        const Text(
-          'Resource Management System',
-          style: TextStyle(fontSize: 13, color: muted),
+        const SizedBox(height: 2),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(height: 1, width: 24, color: const Color(0xff2563eb)),
+            const SizedBox(width: 8),
+            const Text(
+              'APPLICATION',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xff2563eb),
+                letterSpacing: 2.5,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(height: 1, width: 24, color: const Color(0xff2563eb)),
+          ],
         ),
         const SizedBox(height: 10),
         Container(
@@ -2702,13 +2743,16 @@ class _LocationPageState extends State<LocationPage> {
             _DetailRow('Address',                   l['address']?.toString()),
             _DetailRow('City / Barangay',           l['city']?.toString()),
             _DetailRow('Families',                  l['families_count']?.toString()),
-            _DetailRow('Resources Stocked',         '${l['resources_count'] ?? ''} items \u2022 ${l['resources_sum_quantity'] ?? ''} units'),
+            _DetailRow('Resources Stocked',
+                (l['resources_count'] != null || l['resources_sum_quantity'] != null)
+                    ? '${l['resources_count'] ?? 0} items \u2022 ${l['resources_sum_quantity'] ?? 0} units'
+                    : null),
             _DetailRow('Deliveries Completed',      l['completed_distributions_count']?.toString()),
             _DetailRow('Household Members Served',  l['household_member_served']?.toString()),
             _DetailRow('Barangay Captain',          l['contact_person']?.toString()),
             _DetailRow('Captain Contact',           l['contact_phone']?.toString()),
             _DetailRow('Email',                     l['email']?.toString()),
-            _DetailRow('Capacity',                  l['capacity']?.toString()),
+            _DetailRow('Total Resource Stock',         l['resources_sum_quantity']?.toString()),
             _DetailRow('Status',                    l['status']?.toString()),
           ],
         ),
@@ -2796,6 +2840,8 @@ class _ReportPageState extends State<ReportPage> {
   List<Map<String, dynamic>> _resourcesByCategory  = [];
   List<Map<String, dynamic>> _distributionsByMonth = [];
   List<Map<String, dynamic>> _lowStock             = [];
+  List<Map<String, dynamic>> _scansByType          = [];
+  List<Map<String, dynamic>> _resourcesByLocation  = [];
   bool _loading = true;
   String? _error;
 
@@ -2816,6 +2862,10 @@ class _ReportPageState extends State<ReportPage> {
               .map((e) => e as Map<String, dynamic>).toList();
           _lowStock             = (result['low_stock'] as List? ?? [])
               .map((e) => e as Map<String, dynamic>).toList();
+          _scansByType          = (result['qr_scans_by_type'] as List? ?? [])
+              .map((e) => e as Map<String, dynamic>).toList();
+          _resourcesByLocation  = (result['resources_by_location'] as List? ?? [])
+              .map((e) => e as Map<String, dynamic>).toList();
           _loading = false;
         });
       }
@@ -2829,6 +2879,18 @@ class _ReportPageState extends State<ReportPage> {
     if (v is int) return v;
     if (v is num) return v.toInt();
     return int.tryParse(v?.toString() ?? '0') ?? 0;
+  }
+
+  String _formatScanTypeLabel(String raw) {
+    switch (raw.toLowerCase()) {
+      case 'completed': return 'Completed';
+      case 'pending':   return 'Pending';
+      case 'cancelled': return 'Cancelled';
+      case 'released':  return 'Released';
+      case 'returned':  return 'Returned';
+      case 'verified':  return 'Verified';
+      default:          return raw.replaceAll('_', ' ').toUpperCase();
+    }
   }
 
   @override
@@ -2933,6 +2995,45 @@ class _ReportPageState extends State<ReportPage> {
             const SizedBox(height: 14),
           ],
 
+          // QR Scans by Type
+          if (_scansByType.isNotEmpty) ...[
+            Card(child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('QR Scans by Type', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                ..._scansByType.map((s) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    Expanded(child: Text(_formatScanTypeLabel(s['scan_type']?.toString() ?? ''), style: const TextStyle(fontSize: 13, color: ink))),
+                    Text('${s['count']} scans', style: const TextStyle(fontSize: 12, color: muted)),
+                  ]),
+                )),
+              ]),
+            )),
+            const SizedBox(height: 14),
+          ],
+
+          // Resources by Location
+          if (_resourcesByLocation.isNotEmpty) ...[
+            Card(child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Resources by Location', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                ..._resourcesByLocation.map((l) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    Expanded(child: Text(l['location']?.toString() ?? 'Unknown', style: const TextStyle(fontSize: 13, color: ink))),
+                    Text('${l['resources_count']} items \u2022 ${l['total_quantity']} units', style: const TextStyle(fontSize: 12, color: muted)),
+                  ]),
+                )),
+              ]),
+            )),
+            const SizedBox(height: 14),
+          ],
+
+
           // Low Stock Watchlist
           if (_lowStock.isNotEmpty) ...[
             Card(child: Padding(
@@ -2973,6 +3074,288 @@ class _ReportPageState extends State<ReportPage> {
       ),
     );
   }
+}
+
+// ─── Family Register Sheet (staff manually registers a family) ───────────────
+
+class _FamilyRegisterSheet extends StatefulWidget {
+  final List<Map<String, dynamic>> puroks;
+  final List<Map<String, dynamic>> locations;
+  final dynamic staffPurokId;
+  final dynamic staffLocationId;
+  final VoidCallback onRegistered;
+  const _FamilyRegisterSheet({
+    required this.puroks,
+    required this.locations,
+    required this.staffPurokId,
+    required this.staffLocationId,
+    required this.onRegistered,
+  });
+  @override
+  State<_FamilyRegisterSheet> createState() => _FamilyRegisterSheetState();
+}
+
+class _FamilyRegisterSheetState extends State<_FamilyRegisterSheet> {
+  final _familyNameCtrl = TextEditingController();
+  final _headNameCtrl   = TextEditingController();
+  final _emailCtrl      = TextEditingController();
+  final _phoneCtrl      = TextEditingController();
+  final _addressCtrl    = TextEditingController();
+  final _pinCtrl        = TextEditingController();
+  final _confirmPinCtrl = TextEditingController();
+  final List<TextEditingController> _memberCtrls = [TextEditingController()];
+  bool _hidePin = true;
+  bool _hideConfirm = true;
+  bool _busy = false;
+  String? _error;
+  String? _selectedPurokId;
+  String? _selectedLocationId;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-select staff's assigned purok and location
+    _selectedPurokId    = widget.staffPurokId?.toString();
+    _selectedLocationId = widget.staffLocationId?.toString();
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_familyNameCtrl, _headNameCtrl, _emailCtrl, _phoneCtrl,
+        _addressCtrl, _pinCtrl, _confirmPinCtrl, ..._memberCtrls]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    // Validate required fields
+    if (_familyNameCtrl.text.trim().isEmpty || _headNameCtrl.text.trim().isEmpty ||
+        _addressCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'Please fill in all required fields.');
+      return;
+    }
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isNotEmpty && !RegExp(r'^09\d{9}$').hasMatch(phone)) {
+      setState(() => _error = 'Phone must be 11 digits starting with 09.');
+      return;
+    }
+    if (!RegExp(r'^\d{6}$').hasMatch(_pinCtrl.text)) {
+      setState(() => _error = 'PIN must be exactly 6 digits.');
+      return;
+    }
+    if (_pinCtrl.text != _confirmPinCtrl.text) {
+      setState(() => _error = 'PINs do not match.');
+      return;
+    }
+    if (_selectedPurokId == null) {
+      setState(() => _error = 'Please select a purok.');
+      return;
+    }
+    if (_selectedLocationId == null) {
+      setState(() => _error = 'Please select a location.');
+      return;
+    }
+    for (int i = 0; i < _memberCtrls.length; i++) {
+      if (_memberCtrls[i].text.trim().isEmpty) {
+        setState(() => _error = 'Member ${i + 1} name is required.');
+        return;
+      }
+    }
+
+    setState(() { _busy = true; _error = null; });
+    try {
+      await Api.req('POST', '/staff/families/register', body: {
+        'family_name':      _familyNameCtrl.text.trim(),
+        'head_name':        _headNameCtrl.text.trim(),
+        'email':            _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+        'phone':            phone.isEmpty ? null : phone,
+        'address':          _addressCtrl.text.trim(),
+        'household_member': _memberCtrls.length,
+        'member_names':     _memberCtrls.map((c) => c.text.trim()).toList(),
+        'purok_id':         int.parse(_selectedPurokId!),
+        'location_id':      int.parse(_selectedLocationId!),
+        'pin':              _pinCtrl.text,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Family registered successfully.')),
+        );
+        widget.onRegistered();
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _busy = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.9,
+      maxChildSize: 0.95,
+      builder: (_, ctrl) => Column(
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: const Color(0xffe2e8f0), borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                const Expanded(child: Text('Add Family', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink))),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              controller: ctrl,
+              padding: const EdgeInsets.all(20),
+              children: [
+                if (_error != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: const Color(0xfffff1f2), borderRadius: BorderRadius.circular(10)),
+                    child: Text(_error!, style: const TextStyle(color: Color(0xffdc2626), fontSize: 13)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _buildField('Family Name *', _familyNameCtrl),
+                _buildField('Head of Family *', _headNameCtrl),
+                _buildField('Phone (optional, 09XXXXXXXXX)', _phoneCtrl, keyboard: TextInputType.phone, maxLen: 11),
+                _buildField('Email (optional, for PIN recovery)', _emailCtrl, keyboard: TextInputType.emailAddress),
+                _buildField('Address *', _addressCtrl),
+                const SizedBox(height: 4),
+                // Household Members
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Household Members (${_memberCtrls.length})', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ink)),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _memberCtrls.add(TextEditingController())),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add'),
+                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    ),
+                  ],
+                ),
+                ...List.generate(_memberCtrls.length, (i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 24, child: Text('${i + 1}.', textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, color: muted))),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _memberCtrls[i],
+                          decoration: InputDecoration(
+                            labelText: 'Member ${i + 1} full name',
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                        ),
+                      ),
+                      if (_memberCtrls.length > 1)
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18, color: Colors.red),
+                          onPressed: () {
+                            setState(() { _memberCtrls[i].dispose(); _memberCtrls.removeAt(i); });
+                          },
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                )),
+                const SizedBox(height: 8),
+                // Purok
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedPurokId,
+                  decoration: const InputDecoration(labelText: 'Purok *'),
+                  items: widget.puroks.map((p) => DropdownMenuItem<String>(
+                    value: p['id'].toString(),
+                    child: Text(p['name'].toString()),
+                  )).toList(),
+                  onChanged: (v) => setState(() => _selectedPurokId = v),
+                ),
+                const SizedBox(height: 12),
+                // Location
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedLocationId,
+                  decoration: const InputDecoration(labelText: 'Location / Barangay *'),
+                  items: widget.locations.map((l) => DropdownMenuItem<String>(
+                    value: l['id'].toString(),
+                    child: Text(l['name'].toString()),
+                  )).toList(),
+                  onChanged: (v) => setState(() => _selectedLocationId = v),
+                ),
+                const SizedBox(height: 12),
+                // PIN
+                TextField(
+                  controller: _pinCtrl,
+                  obscureText: _hidePin,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: InputDecoration(
+                    labelText: 'Family PIN (6 digits) *',
+                    counterText: '',
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(() => _hidePin = !_hidePin),
+                      icon: Icon(_hidePin ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _confirmPinCtrl,
+                  obscureText: _hideConfirm,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm PIN *',
+                    counterText: '',
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
+                      icon: Icon(_hideConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _busy ? null : _submit,
+                  child: _busy
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Register Family'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildField(String label, TextEditingController ctrl, {TextInputType? keyboard, int? maxLen}) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextField(
+          controller: ctrl,
+          keyboardType: keyboard,
+          maxLength: maxLen,
+          buildCounter: maxLen != null ? (_, {required currentLength, required isFocused, maxLength}) => null : null,
+          decoration: InputDecoration(labelText: label),
+        ),
+      );
 }
 
 // ─── Family Detail Sheet ──────────────────────────────────────────────────────
@@ -3085,6 +3468,9 @@ class FamilyListPage extends StatefulWidget {
 
 class _FamilyListPageState extends State<FamilyListPage> {
   List<Map<String, dynamic>> _families = [];
+  List<Map<String, dynamic>> _puroks = [];
+  List<Map<String, dynamic>> _locations = [];
+  Map<String, dynamic>? _meUser;
   String _search = '';
   bool _loading = true;
   String? _error;
@@ -3095,9 +3481,24 @@ class _FamilyListPageState extends State<FamilyListPage> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final result = await Api.req('GET', '/staff/families');
-      final raw = result['families'] as List? ?? [];
-      if (mounted) setState(() { _families = raw.map((e) => e as Map<String, dynamic>).toList(); _loading = false; });
+      final results = await Future.wait([
+        Api.req('GET', '/staff/families'),
+        Api.req('GET', '/puroks', auth: false),
+        Api.req('GET', '/me'),
+      ]);
+      final raw = results[0]['families'] as List? ?? [];
+      final puroksRaw = results[1]['puroks'] as List? ?? [];
+      final locRaw = results[1]['locations'] as List? ?? [];
+      final user = results[2]['user'] as Map<String, dynamic>?;
+      if (mounted) {
+        setState(() {
+          _families = raw.map((e) => e as Map<String, dynamic>).toList();
+          _puroks = puroksRaw.map((e) => e as Map<String, dynamic>).toList();
+          _locations = locRaw.map((e) => e as Map<String, dynamic>).toList();
+          _meUser = user;
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
     }
@@ -3120,16 +3521,47 @@ class _FamilyListPageState extends State<FamilyListPage> {
     );
   }
 
+  void _openRegisterForm() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _FamilyRegisterSheet(
+        puroks: _puroks,
+        locations: _locations,
+        staffPurokId: _meUser?['purok_id'],
+        staffLocationId: _meUser?['location_id'],
+        onRegistered: () { Navigator.pop(context); _load(); },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            onChanged: (v) => setState(() => _search = v),
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search families...'),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => setState(() => _search = v),
+                  decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search families...'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              FilledButton.icon(
+                onPressed: _openRegisterForm,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Family'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
           ),
         ),
         if (_loading) const Center(child: CircularProgressIndicator()),
@@ -3715,7 +4147,29 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(child: Text(_error!, style: const TextStyle(color: muted, fontSize: 13)))
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.cloud_off_outlined, size: 36, color: muted),
+                              const SizedBox(height: 10),
+                              const Text('Could not load announcements.',
+                                  style: TextStyle(fontWeight: FontWeight.w700, color: ink)),
+                              const SizedBox(height: 6),
+                              const Text('Check your connection and try again.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: muted, fontSize: 12)),
+                              const SizedBox(height: 12),
+                              OutlinedButton(
+                                onPressed: () { setState(() { _loading = true; _error = null; }); _load(); },
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                     : _items.isEmpty
                         ? const Center(
                             child: Text('No announcements yet.',

@@ -318,10 +318,16 @@ class _RegisterPageState extends State<RegisterPage> {
   final _fullName = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  bool _hidePassword = true;
+  bool _hideConfirm = true;
   bool _busy = false;
   String? _error;
   List<Map<String, dynamic>> _puroks = [];
+  List<Map<String, dynamic>> _locations = [];
   String? _selectedPurokId;
+  String? _selectedLocationId;
   bool _puroksLoading = false;
   bool _puroksLoadFailed = false;
 
@@ -335,8 +341,15 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() { _puroksLoading = true; _puroksLoadFailed = false; });
     try {
       final response = await Api.req('GET', '/puroks', auth: false);
-      final list = (response['puroks'] as List).cast<Map<String, dynamic>>();
-      if (mounted) setState(() { _puroks = list; _puroksLoading = false; });
+      final purokList = (response['puroks'] as List).cast<Map<String, dynamic>>();
+      final locationList = (response['locations'] as List? ?? []).cast<Map<String, dynamic>>();
+      if (mounted) {
+        setState(() {
+          _puroks = purokList;
+          _locations = locationList;
+          _puroksLoading = false;
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() { _puroksLoading = false; _puroksLoadFailed = true; });
@@ -359,6 +372,18 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() => _error = 'Please select a purok.');
       return;
     }
+    if (_selectedLocationId == null) {
+      setState(() => _error = 'Please select a location.');
+      return;
+    }
+    if (_password.text.length < 8) {
+      setState(() => _error = 'Password must be at least 8 characters.');
+      return;
+    }
+    if (_password.text != _confirmPassword.text) {
+      setState(() => _error = 'Passwords do not match.');
+      return;
+    }
     setState(() { _busy = true; _error = null; });
     try {
       await Api.req('POST', '/register', auth: false, body: {
@@ -366,6 +391,9 @@ class _RegisterPageState extends State<RegisterPage> {
         'email': _email.text.trim(),
         'phone': phone.isEmpty ? null : phone,
         'purok_id': int.parse(_selectedPurokId!),
+        'location_id': int.parse(_selectedLocationId!),
+        'password': _password.text,
+        'password_confirmation': _confirmPassword.text,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -383,6 +411,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void dispose() {
     _fullName.dispose(); _email.dispose(); _phone.dispose();
+    _password.dispose(); _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -428,6 +457,29 @@ class _RegisterPageState extends State<RegisterPage> {
                               decoration: const InputDecoration(counterText: ''),
                             ),
                             const SizedBox(height: 14),
+                            const _FieldLabel('Location / Barangay'),
+                            const SizedBox(height: 6),
+                            if (_puroksLoading)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                              )
+                            else if (_puroksLoadFailed)
+                              const SizedBox.shrink()
+                            else
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedLocationId,
+                                hint: const Text('Select Location'),
+                                items: _locations.map((l) => DropdownMenuItem<String>(
+                                  value: l['id'].toString(),
+                                  child: Text(l['name'].toString()),
+                                )).toList(),
+                                onChanged: (v) => setState(() => _selectedLocationId = v),
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                ),
+                              ),
+                            const SizedBox(height: 14),
                             const _FieldLabel('Assigned Purok'),
                             const SizedBox(height: 6),
                             if (_puroksLoading)
@@ -463,6 +515,36 @@ class _RegisterPageState extends State<RegisterPage> {
                                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                                 ),
                               ),
+                            const SizedBox(height: 14),
+                            const _FieldLabel('Password (min 8 characters)'),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _password,
+                              obscureText: _hidePassword,
+                              decoration: InputDecoration(
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(() => _hidePassword = !_hidePassword),
+                                  icon: Icon(_hidePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            const _FieldLabel('Confirm password'),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _confirmPassword,
+                              obscureText: _hideConfirm,
+                              decoration: InputDecoration(
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
+                                  icon: Icon(_hideConfirm
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined),
+                                ),
+                              ),
+                            ),
                             if (_error != null) ...[
                               const SizedBox(height: 12),
                               Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
@@ -977,7 +1059,13 @@ class _StaffHomeState extends State<StaffHome> {
         actions: [
           IconButton(
             tooltip: 'Notifications',
-            onPressed: () => _showInfo(context, 'Notifications', 'Notifications will appear here when supported by the API.'),
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+              builder: (_) => const _NotificationsSheet(),
+            ),
             icon: const Icon(Icons.notifications_none_rounded),
           ),
           PopupMenuButton<String>(
@@ -1134,10 +1222,8 @@ class _StaffDashboardState extends State<StaffDashboard> {
           final purokName    = user['purok']?['name']?.toString();
           final staffName    = user['name']?.toString();
 
-          final pendingOrTransit = distributions.where((e) {
-            final s = (e as Map)['status']?.toString().toLowerCase() ?? '';
-            return s == 'pending' || s == 'in_transit';
-          }).length;
+          final pending = distributions.where((e) =>
+              (e as Map)['status']?.toString().toLowerCase() == 'pending').length;
           final completed = distributions.where((e) =>
               (e as Map)['status']?.toString().toLowerCase() == 'completed').length;
           final cancelled = distributions.where((e) =>
@@ -1146,6 +1232,11 @@ class _StaffDashboardState extends State<StaffDashboard> {
             final q = (e as Map)['quantity'];
             return sum + (q is num ? q : (num.tryParse(q.toString()) ?? 0));
           });
+          final householdsServed = families.where((f) {
+            final dist = (f as Map)['latest_distribution'];
+            return dist is Map &&
+                dist['status']?.toString().toLowerCase() == 'completed';
+          }).length;
 
           return RefreshIndicator(
             onRefresh: () async => setState(() => future = _load()),
@@ -1213,12 +1304,12 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   children: [
                     _StatCard(title: 'Total Resources',      value: snap.hasData ? '${resources.length}'    : '\u2014', icon: Icons.inventory_2_outlined,       tint: const Color(0xffeff6ff), color: blue),
                     _StatCard(title: 'Total Stock Quantity',  value: snap.hasData ? '$stock'                 : '\u2014', icon: Icons.widgets_outlined,            tint: const Color(0xffeef2ff), color: const Color(0xff4f46e5)),
-                    _StatCard(title: 'Pending / In Transit',  value: snap.hasData ? '$pendingOrTransit'      : '\u2014', icon: Icons.local_shipping_outlined,     tint: const Color(0xfff1f5f9), color: const Color(0xff475569)),
+                    _StatCard(title: 'Pending',               value: snap.hasData ? '$pending'           : '\u2014', icon: Icons.local_shipping_outlined,     tint: const Color(0xfff1f5f9), color: const Color(0xff475569)),
                     _StatCard(title: 'Completed',             value: snap.hasData ? '$completed'             : '\u2014', icon: Icons.check_circle_outline,        tint: const Color(0xffecfdf5), color: const Color(0xff059669)),
                     _StatCard(title: 'Cancelled',             value: snap.hasData ? '$cancelled'             : '\u2014', icon: Icons.cancel_outlined,             tint: const Color(0xfffff1f2), color: const Color(0xffdc2626)),
                     _StatCard(title: 'Families',              value: snap.hasData ? '${families.length}'     : '\u2014', icon: Icons.groups_outlined,             tint: const Color(0xffeff6ff), color: blue),
                     _StatCard(title: 'QR Scans Logged',       value: snap.hasData ? '${scans.length}'        : '\u2014', icon: Icons.qr_code_2_rounded,           tint: const Color(0xfffaf5ff), color: const Color(0xffa855f7)),
-                    _StatCard(title: 'Households Served',     value: snap.hasData ? '$completed'             : '\u2014', icon: Icons.volunteer_activism_outlined, tint: const Color(0xfff0fdfa), color: const Color(0xff0d9488)),
+                    _StatCard(title: 'Households Served',     value: snap.hasData ? '$householdsServed'  : '\u2014', icon: Icons.volunteer_activism_outlined, tint: const Color(0xfff0fdfa), color: const Color(0xff0d9488)),
                   ],
                 ),
                 const SizedBox(height: 22),
@@ -1506,7 +1597,7 @@ class _ScanPageState extends State<ScanPage> {
         'scan_time':       _scanTime,
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tracking record saved.')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tracking record saved successfully.')));
         _resetForm();
       }
     } catch (e) {
@@ -1882,7 +1973,7 @@ class _MessagePageState extends State<MessagePage> {
                     children: [
                       Icon(Icons.chat_bubble_outline, size: 40, color: muted),
                       SizedBox(height: 8),
-                      Text('No messages yet. Say hello!', style: TextStyle(color: muted, fontSize: 13)),
+                      Text('No messages yet. Write to admin below.', style: TextStyle(color: muted, fontSize: 13)),
                     ],
                   ),
                 )
@@ -2077,6 +2168,15 @@ class _ResourcePageState extends State<ResourcePage> {
     return muted;
   }
 
+  String _formatResourceStatus(String? raw) {
+    switch (raw?.toLowerCase()) {
+      case 'in_stock':      return 'In Stock';
+      case 'low_stock':     return 'Low Stock';
+      case 'out_of_stock':  return 'Out of Stock';
+      default:              return raw ?? '';
+    }
+  }
+
   void _showDetail(Map<String, dynamic> r) {
     showModalBottomSheet(
       context: context,
@@ -2096,7 +2196,7 @@ class _ResourcePageState extends State<ResourcePage> {
             const SizedBox(height: 12),
             _DetailRow('Category', r['category']?.toString()),
             _DetailRow('Quantity', '${r['quantity'] ?? ''} ${r['unit'] ?? ''}'),
-            _DetailRow('Status', r['status']?.toString()),
+            _DetailRow('Status', _formatResourceStatus(r['status']?.toString())),
             _DetailRow('Location', r['location']?['name']?.toString()),
             _DetailRow('Disaster', r['disaster']?.toString()),
             _DetailRow('Description', r['description']?.toString()),
@@ -2213,7 +2313,7 @@ class _ResourcePageState extends State<ResourcePage> {
                                             child: Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                               decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                                              child: Text(status, style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+                                              child: Text(_formatResourceStatus(status), style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
                                             ),
                                           ),
                                       ],
@@ -2365,7 +2465,7 @@ class _DistributionPageState extends State<DistributionPage> {
             const SizedBox(height: 16),
             const Text('Distribution Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
             const SizedBox(height: 12),
-            _DetailRow('Distribution ID', d['qr_code']?.toString() ?? d['id']?.toString()),
+            _DetailRow('Relief Code', d['qr_code']?.toString() ?? d['id']?.toString()),
             _DetailRow('Family ID', _formatFamilyId(family['family_id']?.toString() ?? d['family_id']?.toString())),
             _DetailRow('Family Name', family['family_name']?.toString() ?? d['family_name']?.toString()),
             _DetailRow('Family Head', family['head_name']?.toString() ?? d['head_name']?.toString()),
@@ -2432,7 +2532,30 @@ class _DistributionPageState extends State<DistributionPage> {
           ),
         ),
         if (_loading) const Center(child: CircularProgressIndicator()),
-        if (_error != null) Padding(padding: const EdgeInsets.all(16), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_outlined, size: 36, color: muted),
+                    const SizedBox(height: 8),
+                    Text(_error!, style: const TextStyle(color: muted, fontSize: 13),
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: _load,
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('Try again'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
@@ -2547,6 +2670,17 @@ class _LocationPageState extends State<LocationPage> {
     return muted;
   }
 
+  String _formatLocationType(String? raw) {
+    switch (raw?.toLowerCase()) {
+      case 'distribution_center': return 'Distribution Center';
+      case 'warehouse':           return 'Warehouse';
+      case 'staging_area':        return 'Staging Area';
+      case 'evacuation_center':   return 'Evacuation Center';
+      case 'relief_center':       return 'Relief Center';
+      default:                    return raw ?? '';
+    }
+  }
+
   void _showDetail(Map<String, dynamic> l) {
     showModalBottomSheet(
       context: context,
@@ -2564,7 +2698,7 @@ class _LocationPageState extends State<LocationPage> {
             const SizedBox(height: 16),
             Text(l['name']?.toString() ?? 'Location', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
             const SizedBox(height: 12),
-            _DetailRow('Type',                      l['type']?.toString()),
+            _DetailRow('Type',                      _formatLocationType(l['type']?.toString())),
             _DetailRow('Address',                   l['address']?.toString()),
             _DetailRow('City / Barangay',           l['city']?.toString()),
             _DetailRow('Families',                  l['families_count']?.toString()),
@@ -2620,7 +2754,7 @@ class _LocationPageState extends State<LocationPage> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(l['name']?.toString() ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                                        if ((l['type']?.toString() ?? '').isNotEmpty) Text('${l['type']} \u2022 ${l['city'] ?? ''}', style: const TextStyle(fontSize: 12, color: muted)),
+                                        if ((l['type']?.toString() ?? '').isNotEmpty) Text('${_formatLocationType(l['type']?.toString())} \u2022 ${l['city'] ?? ''}', style: const TextStyle(fontSize: 12, color: muted)),
                                         if (status.isNotEmpty)
                                           Padding(
                                             padding: const EdgeInsets.only(top: 4),
@@ -2876,10 +3010,10 @@ class _FamilyDetailSheetState extends State<_FamilyDetailSheet> {
       if (mounted) {
         setState(() { _members = list; _loadingMembers = false; });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
-          _membersError = e.toString().replaceFirst('Exception: ', '');
+          _membersError = 'Could not load members.';
           _loadingMembers = false;
         });
       }
@@ -3370,7 +3504,7 @@ class _ApiListPageState extends State<_ApiListPage> {
           row['quantity_change'] == null ? null : 'Qty ${row['quantity_change']}',
           row['location']?['name'],
           row['scanner']?['name'] == null ? null : 'By ${row['scanner']['name']}',
-          row['scanned_at'] ?? row['created_at'],
+          _fmtScanDate(row['scanned_at'] ?? row['created_at']),
         ],
       'location' => [row['address'], row['purok'], row['type'], row['status']],
       'report'   => [row['description'], row['created_at'] ?? row['date']],
@@ -3381,6 +3515,16 @@ class _ApiListPageState extends State<_ApiListPage> {
         .where((value) => value != null && value.toString().trim().isNotEmpty)
         .map((value) => value.toString())
         .join(' \u2022 ');
+  }
+
+  String _fmtScanDate(dynamic raw) {
+    if (raw == null) return '';
+    try {
+      final dt = DateTime.parse(raw.toString()).toLocal();
+      return DateFormat('MMM d, y h:mm a').format(dt);
+    } catch (_) {
+      return raw.toString();
+    }
   }
 
   @override
@@ -3501,6 +3645,111 @@ class _ApiListPageState extends State<_ApiListPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _NotificationsSheet extends StatefulWidget {
+  const _NotificationsSheet();
+  @override
+  State<_NotificationsSheet> createState() => _NotificationsSheetState();
+}
+
+class _NotificationsSheetState extends State<_NotificationsSheet> {
+  List<Map<String, dynamic>> _items = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final result = await Api.req('GET', '/announcements');
+      final list = result['announcements'] as List? ??
+          result['data'] as List? ?? [];
+      if (mounted) {
+        setState(() {
+          _items = list.map((e) => e as Map<String, dynamic>).toList();
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.5,
+      maxChildSize: 0.9,
+      builder: (_, ctrl) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text('Announcements',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: ink)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Text(_error!, style: const TextStyle(color: muted, fontSize: 13)))
+                    : _items.isEmpty
+                        ? const Center(
+                            child: Text('No announcements yet.',
+                                style: TextStyle(color: muted, fontSize: 13)))
+                        : ListView.separated(
+                            controller: ctrl,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _items.length,
+                            separatorBuilder: (_, __) => const Divider(height: 12),
+                            itemBuilder: (_, i) {
+                              final item = _items[i];
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item['title']?.toString() ?? 'Announcement',
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: ink),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    item['body']?.toString() ?? '',
+                                    style: const TextStyle(
+                                        fontSize: 13, color: muted, height: 1.45),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+          ),
+        ],
+      ),
     );
   }
 }

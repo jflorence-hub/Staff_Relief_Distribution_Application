@@ -317,15 +317,29 @@ class _RegisterPageState extends State<RegisterPage> {
   final _fullName = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
-  final _password = TextEditingController();
-  final _confirmPassword = TextEditingController();
   bool _busy = false;
-  bool _hidePassword = true;
-  bool _hideConfirm = true;
   String? _error;
+  List<Map<String, dynamic>> _puroks = [];
+  String? _selectedPurokId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPuroks();
+  }
+
+  Future<void> _loadPuroks() async {
+    try {
+      final response = await Api.req('GET', '/puroks', auth: false);
+      final list = (response['puroks'] as List).cast<Map<String, dynamic>>();
+      setState(() => _puroks = list);
+    } catch (_) {
+      // silently ignore — dropdown will be empty
+    }
+  }
 
   Future<void> _register() async {
-    if (_fullName.text.trim().isEmpty || _email.text.trim().isEmpty || _password.text.isEmpty) {
+    if (_fullName.text.trim().isEmpty || _email.text.trim().isEmpty) {
       setState(() => _error = 'Please fill in all required fields.');
       return;
     }
@@ -335,13 +349,8 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() => _error = 'Phone number must start with 09 and be 11 digits.');
       return;
     }
-    // Password length
-    if (_password.text.length < 8) {
-      setState(() => _error = 'Password must be at least 8 characters.');
-      return;
-    }
-    if (_password.text != _confirmPassword.text) {
-      setState(() => _error = 'Passwords do not match.');
+    if (_selectedPurokId == null) {
+      setState(() => _error = 'Please select a purok.');
       return;
     }
     setState(() { _busy = true; _error = null; });
@@ -350,13 +359,11 @@ class _RegisterPageState extends State<RegisterPage> {
         'name': _fullName.text.trim(),
         'email': _email.text.trim(),
         'phone': phone.isEmpty ? null : phone,
-        'password': _password.text,
-        'password_confirmation': _confirmPassword.text,
-        'role': 'staff',
+        'purok_id': int.parse(_selectedPurokId!),
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created! Please sign in.')),
+          const SnackBar(content: Text('Registration request submitted. You will receive an email once approved.')),
         );
         Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
       }
@@ -370,7 +377,6 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void dispose() {
     _fullName.dispose(); _email.dispose(); _phone.dispose();
-    _password.dispose(); _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -387,10 +393,10 @@ class _RegisterPageState extends State<RegisterPage> {
                   children: [
                     const Center(child: _AppLogo()),
                     const SizedBox(height: 24),
-                    const Text('Create an account', textAlign: TextAlign.center,
+                    const Text('Request Staff Access', textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: ink)),
                     const SizedBox(height: 6),
-                    const Text('Join the relief coordination team', textAlign: TextAlign.center,
+                    const Text('Your request will be reviewed by an admin', textAlign: TextAlign.center,
                         style: TextStyle(color: muted, fontSize: 14)),
                     const SizedBox(height: 24),
                     Card(
@@ -416,29 +422,18 @@ class _RegisterPageState extends State<RegisterPage> {
                               decoration: const InputDecoration(counterText: ''),
                             ),
                             const SizedBox(height: 14),
-                            const _FieldLabel('Password (min 8 characters)'),
+                            const _FieldLabel('Assigned Purok'),
                             const SizedBox(height: 6),
-                            TextField(
-                              controller: _password,
-                              obscureText: _hidePassword,
-                              decoration: InputDecoration(
-                                suffixIcon: IconButton(
-                                  onPressed: () => setState(() => _hidePassword = !_hidePassword),
-                                  icon: Icon(_hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            const _FieldLabel('Confirm password'),
-                            const SizedBox(height: 6),
-                            TextField(
-                              controller: _confirmPassword,
-                              obscureText: _hideConfirm,
-                              decoration: InputDecoration(
-                                suffixIcon: IconButton(
-                                  onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
-                                  icon: Icon(_hideConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                                ),
+                            DropdownButtonFormField<String>(
+                              value: _selectedPurokId,
+                              hint: const Text('Select Purok'),
+                              items: _puroks.map((p) => DropdownMenuItem<String>(
+                                value: p['id'].toString(),
+                                child: Text(p['name'].toString()),
+                              )).toList(),
+                              onChanged: (v) => setState(() => _selectedPurokId = v),
+                              decoration: const InputDecoration(
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                               ),
                             ),
                             if (_error != null) ...[
@@ -450,7 +445,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               onPressed: _busy ? null : _register,
                               child: _busy
                                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : const Text('Create account'),
+                                  : const Text('Submit Request'),
                             ),
                             const SizedBox(height: 12),
                             Row(

@@ -1,6 +1,7 @@
 ﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
@@ -996,7 +997,6 @@ class _StaffHomeState extends State<StaffHome> {
             },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'profile', child: Text('Profile')),
-              PopupMenuItem(value: 'account', child: Text('Account')),
               PopupMenuItem(value: 'logout', child: Text('Log out')),
             ],
           ),
@@ -1079,19 +1079,12 @@ class _StaffHomeState extends State<StaffHome> {
       bottomNavigationBar: NavigationBar(
         height: 68,
         selectedIndex: index < 4 ? index : 0,
-        onDestinationSelected: (value) {
-          if (value == 4) {
-            scaffoldKey.currentState?.openDrawer();
-          } else {
-            setState(() => index = value);
-          }
-        },
+        onDestinationSelected: (value) => setState(() => index = value),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Resources'),
           NavigationDestination(icon: Icon(Icons.qr_code_scanner), label: 'Scan'),
           NavigationDestination(icon: Icon(Icons.local_shipping_outlined), label: 'Relief'),
-          NavigationDestination(icon: Icon(Icons.menu_rounded), label: 'More'),
         ],
       ),
     );
@@ -1147,6 +1140,8 @@ class _StaffDashboardState extends State<StaffDashboard> {
           }).length;
           final completed = distributions.where((e) =>
               (e as Map)['status']?.toString().toLowerCase() == 'completed').length;
+          final cancelled = distributions.where((e) =>
+              (e as Map)['status']?.toString().toLowerCase() == 'cancelled').length;
           final stock = resources.fold<num>(0, (sum, e) {
             final q = (e as Map)['quantity'];
             return sum + (q is num ? q : (num.tryParse(q.toString()) ?? 0));
@@ -1220,6 +1215,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                     _StatCard(title: 'Total Stock Quantity',  value: snap.hasData ? '$stock'                 : '\u2014', icon: Icons.widgets_outlined,            tint: const Color(0xffeef2ff), color: const Color(0xff4f46e5)),
                     _StatCard(title: 'Pending / In Transit',  value: snap.hasData ? '$pendingOrTransit'      : '\u2014', icon: Icons.local_shipping_outlined,     tint: const Color(0xfff1f5f9), color: const Color(0xff475569)),
                     _StatCard(title: 'Completed',             value: snap.hasData ? '$completed'             : '\u2014', icon: Icons.check_circle_outline,        tint: const Color(0xffecfdf5), color: const Color(0xff059669)),
+                    _StatCard(title: 'Cancelled',             value: snap.hasData ? '$cancelled'             : '\u2014', icon: Icons.cancel_outlined,             tint: const Color(0xfffff1f2), color: const Color(0xffdc2626)),
                     _StatCard(title: 'Families',              value: snap.hasData ? '${families.length}'     : '\u2014', icon: Icons.groups_outlined,             tint: const Color(0xffeff6ff), color: blue),
                     _StatCard(title: 'QR Scans Logged',       value: snap.hasData ? '${scans.length}'        : '\u2014', icon: Icons.qr_code_2_rounded,           tint: const Color(0xfffaf5ff), color: const Color(0xffa855f7)),
                     _StatCard(title: 'Households Served',     value: snap.hasData ? '$completed'             : '\u2014', icon: Icons.volunteer_activism_outlined, tint: const Color(0xfff0fdfa), color: const Color(0xff0d9488)),
@@ -1227,10 +1223,16 @@ class _StaffDashboardState extends State<StaffDashboard> {
                 ),
                 const SizedBox(height: 22),
 
+                const SizedBox(height: 4),
+                const Text(
+                  'Current Relief Distribution',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: ink),
+                ),
+                const SizedBox(height: 6),
                 _SectionCard(
                   title: 'Recent Distributions',
-                  action: 'Refresh',
-                  onAction: () => setState(() => future = _load()),
+                  action: 'View All',
+                  onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DistributionPage())),
                   child: distributions.isEmpty
                       ? const _EmptyState(text: 'No distributions to show yet.')
                       : Column(children: distributions.take(4).map((e) {
@@ -1246,8 +1248,8 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
                 _SectionCard(
                   title: 'Recent QR Scans',
-                  action: 'Refresh',
-                  onAction: () => setState(() => future = _load()),
+                  action: 'View All',
+                  onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanHistoryPage())),
                   child: scans.isEmpty
                       ? const _EmptyState(text: 'No scan records to show yet.')
                       : Column(children: scans.take(4).map((e) {
@@ -1363,17 +1365,18 @@ class _ScanPageState extends State<ScanPage> {
 
   String? _familyId;
   String? _locationId;
-  String  _scanType   = 'released';
-  String  _scanDate   = '';
-  String  _scanTime   = '';
+  String  _scanType    = 'completed';
+  String  _scanDate    = '';
+  String  _scanTime    = '';
   bool    _formVisible = false;
   bool    _cameraOpen  = false;
   bool    _handled     = false;
   bool    _busy        = false;
   String? _error;
+  String? _resourceId;
+  final _receiverCtrl = TextEditingController();
 
   List<Map<String, dynamic>> _families  = [];
-  List<Map<String, dynamic>> _locations = [];
 
   @override
   void initState() {
@@ -1386,7 +1389,7 @@ class _ScanPageState extends State<ScanPage> {
     _qrCtrl.dispose(); _familyCtrl.dispose(); _headCtrl.dispose();
     _purokCtrl.dispose(); _reliefCtrl.dispose(); _qtyCtrl.dispose();
     _locationCtrl.dispose(); _dateCtrl.dispose(); _timeCtrl.dispose();
-    _manualCodeCtrl.dispose();
+    _manualCodeCtrl.dispose(); _receiverCtrl.dispose();
     super.dispose();
   }
 
@@ -1408,14 +1411,6 @@ class _ScanPageState extends State<ScanPage> {
         _locationId = locId;
       });
       if (locName.isNotEmpty) _locationCtrl.text = locName;
-    } catch (_) {}
-
-    try {
-      final res = await Api.req('GET', '/locations');
-      if (mounted) {
-        final raw = res['locations'] as List? ?? [];
-        setState(() => _locations = raw.map((e) => e as Map<String, dynamic>).toList());
-      }
     } catch (_) {}
   }
 
@@ -1458,27 +1453,37 @@ class _ScanPageState extends State<ScanPage> {
     final resource = dist is Map ? dist['resource'] : null;
     final now      = DateTime.now();
     final date = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
-    final time = '${now.hour.toString().padLeft(2,'0')}:${now.minute.toString().padLeft(2,'0')}';
+    final timeSend    = DateFormat('HH:mm').format(now);
+    final timeDisplay = DateFormat('hh:mm a').format(now);
     final purok = (fam['purok'] is Map)
         ? (fam['purok']['name']?.toString() ?? '')
         : (fam['purok']?.toString() ?? '');
     final qty = (dist is Map && dist['quantity'] != null) ? dist['quantity'].toString() : '1';
 
+    // Resolve resource_id from latest_distribution
+    String? resId;
+    if (dist is Map) {
+      final rid = dist['resource']?['id'] ?? dist['resource_id'];
+      resId = rid?.toString();
+    }
+
     setState(() {
       _familyId    = fam['id']?.toString();
       _scanDate    = date;
-      _scanTime    = time;
+      _scanTime    = timeSend;
       _formVisible = true;
       _error       = null;
+      _resourceId  = resId;
       _qtyCtrl.text = qty;
     });
-    _qrCtrl.text     = scannedQr;
-    _familyCtrl.text = '${fam['family_name'] ?? ''} (${fam['family_id'] ?? ''})';
-    _headCtrl.text   = fam['head_name']?.toString() ?? '';
-    _purokCtrl.text  = purok;
-    _reliefCtrl.text = resource is Map ? (resource['name']?.toString() ?? '') : '';
-    _dateCtrl.text   = date;
-    _timeCtrl.text   = time;
+    _qrCtrl.text        = scannedQr;
+    _familyCtrl.text    = '${fam['family_name'] ?? ''} (${fam['family_id'] ?? ''})';
+    _headCtrl.text      = fam['head_name']?.toString() ?? '';
+    _purokCtrl.text     = purok;
+    _reliefCtrl.text    = resource is Map ? (resource['name']?.toString() ?? '') : '';
+    _receiverCtrl.text  = fam['head_name']?.toString() ?? '';
+    _dateCtrl.text      = date;
+    _timeCtrl.text      = timeDisplay;
   }
 
   Future<void> _save() async {
@@ -1493,6 +1498,8 @@ class _ScanPageState extends State<ScanPage> {
         'qr_code':         _qrCtrl.text.trim(),
         'family_id':       int.tryParse(_familyId ?? ''),
         'scan_type':       _scanType,
+        'receiver':        _receiverCtrl.text.trim().isEmpty ? null : _receiverCtrl.text.trim(),
+        'resource_id':     int.tryParse(_resourceId ?? ''),
         'quantity_change': q,
         'location_id':     int.tryParse(_locationId ?? ''),
         'scan_date':       _scanDate,
@@ -1512,9 +1519,10 @@ class _ScanPageState extends State<ScanPage> {
   void _resetForm() {
     setState(() {
       _formVisible = false; _familyId = null;
-      _scanType = 'released'; _error = null; _handled = false;
+      _scanType = 'completed'; _error = null; _handled = false;
+      _resourceId = null;
     });
-    for (final c in [_qrCtrl, _familyCtrl, _headCtrl, _purokCtrl, _reliefCtrl]) { c.clear(); }
+    for (final c in [_qrCtrl, _familyCtrl, _headCtrl, _purokCtrl, _reliefCtrl, _receiverCtrl]) { c.clear(); }
     _qtyCtrl.text = '1';
   }
 
@@ -1621,6 +1629,8 @@ class _ScanPageState extends State<ScanPage> {
                     const SizedBox(height: 12),
                     _ReadField(label: 'Relief / Resource', controller: _reliefCtrl, icon: Icons.inventory_2_outlined),
                     const SizedBox(height: 12),
+                    _ReadField(label: 'Receiver', controller: _receiverCtrl, icon: Icons.person_outline),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _qtyCtrl,
                       keyboardType: TextInputType.number,
@@ -1631,22 +1641,14 @@ class _ScanPageState extends State<ScanPage> {
                       initialValue: _scanType,
                       decoration: const InputDecoration(labelText: 'Scan Status'),
                       items: const [
-                        DropdownMenuItem(value: 'released', child: Text('Released')),
-                        DropdownMenuItem(value: 'returned', child: Text('Returned')),
-                        DropdownMenuItem(value: 'verified', child: Text('Verified')),
+                        DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                        DropdownMenuItem(value: 'pending',   child: Text('Pending')),
+                        DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
                       ],
-                      onChanged: (v) => setState(() => _scanType = v ?? 'released'),
+                      onChanged: (v) => setState(() => _scanType = v ?? 'completed'),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: _locationId?.isNotEmpty == true ? _locationId : null,
-                      decoration: const InputDecoration(labelText: 'Location', prefixIcon: Icon(Icons.location_on_outlined)),
-                      items: _locations.map((l) => DropdownMenuItem<String>(
-                        value: l['id'].toString(),
-                        child: Text(l['name']?.toString() ?? ''),
-                      )).toList(),
-                      onChanged: (v) => setState(() => _locationId = v),
-                    ),
+                    _ReadField(label: 'Location', controller: _locationCtrl, icon: Icons.location_on_outlined),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _dateCtrl,
@@ -1670,9 +1672,9 @@ class _ScanPageState extends State<ScanPage> {
                       onTap: () async {
                         final picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
                         if (picked != null && mounted) {
-                          final t = '${picked.hour.toString().padLeft(2,'0')}:${picked.minute.toString().padLeft(2,'0')}';
-                          setState(() => _scanTime = t);
-                          _timeCtrl.text = t;
+                          final dt = DateTime(2000, 1, 1, picked.hour, picked.minute);
+                          setState(() => _scanTime = DateFormat('HH:mm').format(dt));
+                          _timeCtrl.text = DateFormat('hh:mm a').format(dt);
                         }
                       },
                     ),
@@ -2263,6 +2265,8 @@ class DistributionPage extends StatefulWidget {
 
 class _DistributionPageState extends State<DistributionPage> {
   List<Map<String, dynamic>> _distributions = [];
+  List<Map<String, dynamic>> _schedules = [];
+  Map<String, dynamic>? _selectedSchedule;
   String _search = '';
   bool _loading = true;
   String? _error;
@@ -2275,19 +2279,41 @@ class _DistributionPageState extends State<DistributionPage> {
     try {
       final result = await Api.req('GET', '/distributions/history');
       final raw = result['distributions'] as List? ?? [];
-      if (mounted) setState(() { _distributions = raw.map((e) => e as Map<String, dynamic>).toList(); _loading = false; });
+      final schedRaw = result['schedules'] as List? ?? [];
+      if (mounted) {
+        setState(() {
+          _distributions = raw.map((e) => e as Map<String, dynamic>).toList();
+          _schedules = schedRaw.map((e) => e as Map<String, dynamic>).toList();
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
     }
   }
 
   List<Map<String, dynamic>> get _filtered {
-    if (_search.isEmpty) return _distributions;
-    return _distributions.where((d) {
+    var list = _distributions;
+    if (_selectedSchedule != null) {
+      list = list.where((d) {
+        final date    = d['distribution_date']?.toString().substring(0, 10);
+        final resName = d['resource']?['name']?.toString();
+        final locName = d['location']?['name']?.toString();
+        return date == _selectedSchedule!['date'] &&
+               resName == _selectedSchedule!['resource_name'] &&
+               locName == _selectedSchedule!['location_name'];
+      }).toList();
+    }
+    if (_search.isEmpty) return list;
+    return list.where((d) {
       final hay = '${d['family']?['family_name'] ?? d['family_name'] ?? ''} ${d['family_id'] ?? ''} ${d['status'] ?? ''}'.toLowerCase();
       return hay.contains(_search.toLowerCase());
     }).toList();
   }
+
+  int _countStatus(String status) => _filtered
+      .where((d) => (d['status']?.toString() ?? '') == status)
+      .length;
 
   Color _statusColor(String? s) {
     final v = s?.toLowerCase() ?? '';
@@ -2297,11 +2323,31 @@ class _DistributionPageState extends State<DistributionPage> {
     return muted;
   }
 
+  String _formatFamilyId(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isNotEmpty) return 'FAM-${digits.padLeft(4, '0')}';
+    return raw;
+  }
+
+  String _formatDistDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+      final h  = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final m  = dt.minute.toString().padLeft(2, '0');
+      final ap = dt.hour >= 12 ? 'PM' : 'AM';
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year} $h:$m $ap';
+    } catch (_) { return raw; }
+  }
+
   void _showDetail(Map<String, dynamic> d) {
     final family = d['family'] as Map? ?? {};
     final purok  = family['purok']?['name'] ?? d['purok']?['name'] ?? '';
     final loc    = family['location']?['name'] ?? d['location']?['name'] ?? '';
     final resource = d['resource'] as Map? ?? {};
+    final isCompleted = (d['status']?.toString() ?? '').toLowerCase() == 'completed';
 
     showModalBottomSheet(
       context: context,
@@ -2319,8 +2365,8 @@ class _DistributionPageState extends State<DistributionPage> {
             const SizedBox(height: 16),
             const Text('Distribution Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
             const SizedBox(height: 12),
-            _DetailRow('Distribution ID', d['id']?.toString()),
-            _DetailRow('Family ID', family['family_id']?.toString() ?? d['family_id']?.toString()),
+            _DetailRow('Distribution ID', d['qr_code']?.toString() ?? d['id']?.toString()),
+            _DetailRow('Family ID', _formatFamilyId(family['family_id']?.toString() ?? d['family_id']?.toString())),
             _DetailRow('Family Name', family['family_name']?.toString() ?? d['family_name']?.toString()),
             _DetailRow('Family Head', family['head_name']?.toString() ?? d['head_name']?.toString()),
             _DetailRow('Location', loc.isNotEmpty ? '$purok, $loc' : purok),
@@ -2329,9 +2375,11 @@ class _DistributionPageState extends State<DistributionPage> {
             _DetailRow('Qty', d['quantity']?.toString()),
             _DetailRow('Scanned By', d['distributor']?['name']?.toString() ?? d['scanned_by']?.toString()),
             _DetailRow('Status', d['status']?.toString()),
+            if (isCompleted)
+              _DetailRow('Receiver', d['recipient_name']?.toString() ?? d['receiver']?.toString()),
             _DetailRow('Disaster', d['disaster']?.toString()),
             _DetailRow('Reason', d['reason']?.toString()),
-            _DetailRow('Date', d['distribution_date']?.toString() ?? d['scheduled_at']?.toString()),
+            _DetailRow('Date', _formatDistDate(d['distribution_date']?.toString() ?? d['scheduled_at']?.toString())),
           ],
         ),
       ),
@@ -2343,6 +2391,39 @@ class _DistributionPageState extends State<DistributionPage> {
     final filtered = _filtered;
     return Column(
       children: [
+        if (_schedules.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: DropdownButtonFormField<Map<String, dynamic>?>(
+              initialValue: _selectedSchedule,
+              decoration: const InputDecoration(labelText: 'Distribution Schedule', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('All schedules')),
+                ..._schedules.map((s) => DropdownMenuItem(
+                  value: s,
+                  child: Text(
+                    '${s['date'] ?? ''} \u2022 ${s['resource_name'] ?? ''} \u2022 ${s['location_name'] ?? ''}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                )),
+              ],
+              onChanged: (v) => setState(() => _selectedSchedule = v),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Row(
+            children: [
+              _MiniStatChip('Families',  '${filtered.length}',               const Color(0xff2563eb)),
+              const SizedBox(width: 8),
+              _MiniStatChip('Pending',   '${_countStatus('pending')}',   const Color(0xfff59e0b)),
+              const SizedBox(width: 8),
+              _MiniStatChip('Completed', '${_countStatus('completed')}', const Color(0xff059669)),
+              const SizedBox(width: 8),
+              _MiniStatChip('Cancelled', '${_countStatus('cancelled')}', const Color(0xffdc2626)),
+            ],
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.all(16),
           child: TextField(
@@ -2367,7 +2448,7 @@ class _DistributionPageState extends State<DistributionPage> {
                       final resource = d['resource'] as Map? ?? {};
                       final resName = resource['name']?.toString() ?? d['resource_name']?.toString() ?? '';
                       final status = d['status']?.toString() ?? '';
-                      final date = d['distribution_date']?.toString() ?? d['scheduled_at']?.toString() ?? '';
+                      final date = _formatDistDate(d['distribution_date']?.toString() ?? d['scheduled_at']?.toString());
                       final statusColor = _statusColor(status);
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -2483,14 +2564,18 @@ class _LocationPageState extends State<LocationPage> {
             const SizedBox(height: 16),
             Text(l['name']?.toString() ?? 'Location', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
             const SizedBox(height: 12),
-            _DetailRow('Type', l['type']?.toString()),
-            _DetailRow('Address', l['address']?.toString()),
-            _DetailRow('Barangay', l['barangay']?.toString() ?? l['city']?.toString()),
-            _DetailRow('Capacity', l['capacity']?.toString()),
-            _DetailRow('Contact Person', l['contact_person']?.toString()),
-            _DetailRow('Contact Phone', l['contact_phone']?.toString()),
-            _DetailRow('Email', l['email']?.toString()),
-            _DetailRow('Status', l['status']?.toString()),
+            _DetailRow('Type',                      l['type']?.toString()),
+            _DetailRow('Address',                   l['address']?.toString()),
+            _DetailRow('City / Barangay',           l['city']?.toString()),
+            _DetailRow('Families',                  l['families_count']?.toString()),
+            _DetailRow('Resources Stocked',         '${l['resources_count'] ?? ''} items \u2022 ${l['resources_sum_quantity'] ?? ''} units'),
+            _DetailRow('Deliveries Completed',      l['completed_distributions_count']?.toString()),
+            _DetailRow('Household Members Served',  l['household_member_served']?.toString()),
+            _DetailRow('Barangay Captain',          l['contact_person']?.toString()),
+            _DetailRow('Captain Contact',           l['contact_phone']?.toString()),
+            _DetailRow('Email',                     l['email']?.toString()),
+            _DetailRow('Capacity',                  l['capacity']?.toString()),
+            _DetailRow('Status',                    l['status']?.toString()),
           ],
         ),
       ),
@@ -2535,7 +2620,7 @@ class _LocationPageState extends State<LocationPage> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(l['name']?.toString() ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                                        if ((l['type']?.toString() ?? '').isNotEmpty) Text(l['type'].toString(), style: const TextStyle(fontSize: 12, color: muted)),
+                                        if ((l['type']?.toString() ?? '').isNotEmpty) Text('${l['type']} \u2022 ${l['city'] ?? ''}', style: const TextStyle(fontSize: 12, color: muted)),
                                         if (status.isNotEmpty)
                                           Padding(
                                             padding: const EdgeInsets.only(top: 4),
@@ -2574,6 +2659,9 @@ class ReportPage extends StatefulWidget {
 
 class _ReportPageState extends State<ReportPage> {
   Map<String, dynamic> _summary = {};
+  List<Map<String, dynamic>> _resourcesByCategory  = [];
+  List<Map<String, dynamic>> _distributionsByMonth = [];
+  List<Map<String, dynamic>> _lowStock             = [];
   bool _loading = true;
   String? _error;
 
@@ -2585,7 +2673,18 @@ class _ReportPageState extends State<ReportPage> {
     try {
       final result = await Api.req('GET', '/reports');
       final s = result['summary'] as Map<String, dynamic>? ?? result;
-      if (mounted) setState(() { _summary = s; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _summary = s;
+          _resourcesByCategory  = (result['resources_by_category']  as List? ?? [])
+              .map((e) => e as Map<String, dynamic>).toList();
+          _distributionsByMonth = (result['distributions_by_month'] as List? ?? [])
+              .map((e) => e as Map<String, dynamic>).toList();
+          _lowStock             = (result['low_stock'] as List? ?? [])
+              .map((e) => e as Map<String, dynamic>).toList();
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
     }
@@ -2615,15 +2714,15 @@ class _ReportPageState extends State<ReportPage> {
     }
 
     final stats = [
-      {'label': 'Total Resources',    'value': _val('total_resources'),    'icon': Icons.inventory_2_outlined,       'color': blue,                    'tint': const Color(0xffeff6ff)},
-      {'label': 'Total Families',     'value': _val('total_families'),     'icon': Icons.groups_outlined,            'color': const Color(0xff4f46e5), 'tint': const Color(0xffeef2ff)},
-      {'label': 'Total Distributions','value': _val('total_distributions'), 'icon': Icons.local_shipping_outlined,    'color': const Color(0xff0d9488), 'tint': const Color(0xfff0fdfa)},
-      {'label': 'QR Scans',           'value': _val('total_scans'),        'icon': Icons.qr_code_2_rounded,          'color': const Color(0xffa855f7), 'tint': const Color(0xfffaf5ff)},
-      {'label': 'Households Served',  'value': _val('household_member_served'), 'icon': Icons.volunteer_activism_outlined, 'color': const Color(0xff059669), 'tint': const Color(0xffecfdf5)},
-      {'label': 'Low Stock Items',    'value': _val('low_stock_count'),    'icon': Icons.warning_amber_rounded,      'color': const Color(0xffdc2626), 'tint': const Color(0xfffff1f2)},
+      {'label': 'Total Resources',     'value': _val('total_resources'),          'icon': Icons.inventory_2_outlined,        'color': blue,                    'tint': const Color(0xffeff6ff)},
+      {'label': 'Total Families',      'value': _val('total_families'),           'icon': Icons.groups_outlined,             'color': const Color(0xff4f46e5), 'tint': const Color(0xffeef2ff)},
+      {'label': 'Completed',           'value': _val('completed_distributions'),  'icon': Icons.check_circle_outline,        'color': const Color(0xff059669), 'tint': const Color(0xffecfdf5)},
+      {'label': 'Pending',             'value': _val('pending_distributions'),    'icon': Icons.hourglass_empty_outlined,    'color': const Color(0xfff59e0b), 'tint': const Color(0xfffffbeb)},
+      {'label': 'Cancelled',           'value': _val('cancelled_distributions'),  'icon': Icons.cancel_outlined,             'color': const Color(0xffdc2626), 'tint': const Color(0xfffff1f2)},
+      {'label': 'Households Served',   'value': _val('household_member_served'),  'icon': Icons.volunteer_activism_outlined, 'color': const Color(0xff0d9488), 'tint': const Color(0xfff0fdfa)},
+      {'label': 'QR Scans',            'value': _val('total_scans'),              'icon': Icons.qr_code_2_rounded,           'color': const Color(0xffa855f7), 'tint': const Color(0xfffaf5ff)},
+      {'label': 'Low Stock Items',     'value': _val('low_stock_count'),          'icon': Icons.warning_amber_rounded,       'color': const Color(0xffdc2626), 'tint': const Color(0xfffff1f2)},
     ];
-
-    final maxVal = stats.fold<int>(1, (m, s) => (s['value'] as int) > m ? (s['value'] as int) : m);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -2661,43 +2760,81 @@ class _ReportPageState extends State<ReportPage> {
             )).toList(),
           ),
           const SizedBox(height: 20),
-          Card(
-            child: Padding(
+
+          // Resources by Category
+          if (_resourcesByCategory.isNotEmpty) ...[
+            Card(child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Summary Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 14),
-                  ...stats.map((s) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(s['label'] as String, style: const TextStyle(fontSize: 12, color: muted)),
-                            Text('${s['value']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ink)),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: maxVal > 0 ? (s['value'] as int) / maxVal : 0.0,
-                            backgroundColor: const Color(0xfff1f5f9),
-                            color: s['color'] as Color,
-                            minHeight: 6,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-                ],
-              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Resources by Category', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                ..._resourcesByCategory.map((c) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    Expanded(child: Text(c['category']?.toString() ?? 'Uncategorized', style: const TextStyle(fontSize: 13, color: ink))),
+                    Text('${c['count']} items \u2022 ${c['quantity']} units', style: const TextStyle(fontSize: 12, color: muted)),
+                  ]),
+                )),
+              ]),
+            )),
+            const SizedBox(height: 14),
+          ],
+
+          // Distributions by Month
+          if (_distributionsByMonth.isNotEmpty) ...[
+            Card(child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Distributions by Month', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                ..._distributionsByMonth.map((m) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    Expanded(child: Text(m['month']?.toString() ?? '', style: const TextStyle(fontSize: 13, color: ink))),
+                    Text('${m['count']} distributions \u2022 ${m['household_member']} served', style: const TextStyle(fontSize: 12, color: muted)),
+                  ]),
+                )),
+              ]),
+            )),
+            const SizedBox(height: 14),
+          ],
+
+          // Low Stock Watchlist
+          if (_lowStock.isNotEmpty) ...[
+            Card(child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Low Stock Watchlist', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xffdc2626))),
+                const SizedBox(height: 12),
+                ..._lowStock.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xffdc2626), size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(item['name']?.toString() ?? '', style: const TextStyle(fontSize: 13, color: ink))),
+                    Text('${item['quantity']} / ${item['minimum_threshold']} ${item['unit'] ?? ''}',
+                        style: const TextStyle(fontSize: 12, color: Color(0xffdc2626), fontWeight: FontWeight.w600)),
+                  ]),
+                )),
+              ]),
+            )),
+            const SizedBox(height: 14),
+          ],
+
+          // Export Report button
+          FilledButton.icon(
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Export report \u2014 coming soon.')),
+            ),
+            icon: const Icon(Icons.download_outlined),
+            label: const Text('Export Report'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xff4f46e5),
+              minimumSize: const Size(double.infinity, 48),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -3393,4 +3530,27 @@ class _StatusChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MiniStatChip extends StatelessWidget {
+  const _MiniStatChip(this.label, this.value, this.color);
+  final String label, value;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+          Text(label, style: const TextStyle(fontSize: 10, color: muted)),
+        ],
+      ),
+    ),
+  );
 }

@@ -427,7 +427,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             const _FieldLabel('Assigned Purok'),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
-                              value: _selectedPurokId,
+                              initialValue: _selectedPurokId,
                               hint: const Text('Select Purok'),
                               items: _puroks.map((p) => DropdownMenuItem<String>(
                                 value: p['id'].toString(),
@@ -2680,6 +2680,106 @@ class _ReportPageState extends State<ReportPage> {
   }
 }
 
+// ─── Family Detail Sheet ──────────────────────────────────────────────────────
+
+class _FamilyDetailSheet extends StatefulWidget {
+  final Map<String, dynamic> family;
+  const _FamilyDetailSheet({required this.family});
+
+  @override
+  State<_FamilyDetailSheet> createState() => _FamilyDetailSheetState();
+}
+
+class _FamilyDetailSheetState extends State<_FamilyDetailSheet> {
+  List<Map<String, dynamic>>? _members;
+  bool _loadingMembers = true;
+  String? _membersError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMembers();
+  }
+
+  Future<void> _loadMembers() async {
+    final id = widget.family['id'];
+    if (id == null) {
+      setState(() { _loadingMembers = false; _membersError = 'No family ID.'; });
+      return;
+    }
+    try {
+      final result = await Api.req('GET', '/families/$id/members');
+      final list = (result['members'] as List? ?? [])
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+      if (mounted) {
+        setState(() { _members = list; _loadingMembers = false; });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _membersError = e.toString().replaceFirst('Exception: ', '');
+          _loadingMembers = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final f = widget.family;
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.65,
+      maxChildSize: 0.95,
+      builder: (_, ctrl) => ListView(
+        controller: ctrl,
+        padding: const EdgeInsets.all(20),
+        children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffe2e8f0), borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 16),
+          Text(f['family_name']?.toString() ?? 'Family', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
+          const SizedBox(height: 12),
+          _DetailRow('Family', f['family_name']?.toString()),
+          _DetailRow('Head of Family', f['head_name']?.toString()),
+          _DetailRow('Phone', f['phone']?.toString()),
+          _DetailRow('Household Members', f['household_member']?.toString() ?? f['members_count']?.toString()),
+          _DetailRow('Purok', (f['purok'] is Map) ? f['purok']['name']?.toString() : f['purok']?.toString()),
+          _DetailRow('Location', (f['location'] is Map) ? f['location']['name']?.toString() : f['location']?.toString()),
+          _DetailRow('Status', f['status']?.toString()),
+          _DetailRow('Family ID', f['family_id']?.toString()),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+          const Text('Household Members', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: ink)),
+          const SizedBox(height: 10),
+          if (_loadingMembers)
+            const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
+          else if (_membersError != null)
+            Text(_membersError!, style: const TextStyle(color: Colors.red, fontSize: 13))
+          else if (_members == null || _members!.isEmpty)
+            const Text('No member names recorded.', style: TextStyle(color: muted, fontSize: 13))
+          else
+            ...(_members!.map((m) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 26, height: 26,
+                    decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(8)),
+                    child: Center(child: Text('${m['number']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: blue))),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(m['name']?.toString() ?? 'Member #${m['number']}', style: const TextStyle(fontSize: 13, color: ink)),
+                ],
+              ),
+            ))),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Family List Page ─────────────────────────────────────────────────────────
 
 class FamilyListPage extends StatefulWidget {
@@ -2721,29 +2821,7 @@ class _FamilyListPageState extends State<FamilyListPage> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        maxChildSize: 0.95,
-        builder: (_, ctrl) => ListView(
-          controller: ctrl,
-          padding: const EdgeInsets.all(20),
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffe2e8f0), borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 16),
-            Text(f['family_name']?.toString() ?? 'Family', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
-            const SizedBox(height: 12),
-            _DetailRow('Family', f['family_name']?.toString()),
-            _DetailRow('Head of Family', f['head_name']?.toString()),
-            _DetailRow('Phone', f['phone']?.toString()),
-            _DetailRow('Household Members', f['household_member']?.toString() ?? f['members_count']?.toString()),
-            _DetailRow('Purok', (f['purok'] is Map) ? f['purok']['name']?.toString() : f['purok']?.toString()),
-            _DetailRow('Location', (f['location'] is Map) ? f['location']['name']?.toString() : f['location']?.toString()),
-            _DetailRow('Status', f['status']?.toString()),
-            _DetailRow('Family ID', f['family_id']?.toString()),
-          ],
-        ),
-      ),
+      builder: (_) => _FamilyDetailSheet(family: f),
     );
   }
 

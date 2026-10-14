@@ -334,7 +334,9 @@ class _RegisterPageState extends State<RegisterPage> {
       final list = (response['puroks'] as List).cast<Map<String, dynamic>>();
       setState(() => _puroks = list);
     } catch (_) {
-      // silently ignore — dropdown will be empty
+      if (mounted) {
+        setState(() => _error = 'Could not load puroks. Please check your connection and try again.');
+      }
     }
   }
 

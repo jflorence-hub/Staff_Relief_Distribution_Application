@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -67,7 +67,7 @@ class StaffApp extends StatelessWidget {
       );
 }
 
-// ─── Shared logo widget ──────────────────────────────────────────────────────
+// --- Shared logo widget ------------------------------------------------------
 
 class _AppLogo extends StatelessWidget {
   const _AppLogo();
@@ -186,7 +186,7 @@ class _AppLogo extends StatelessWidget {
   }
 }
 
-// ─── Login Page ──────────────────────────────────────────────────────────────
+// --- Login Page --------------------------------------------------------------
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -347,7 +347,7 @@ class _LoginPageState extends State<LoginPage> {
       );
 }
 
-// ─── Register Page ───────────────────────────────────────────────────────────
+// --- Register Page -----------------------------------------------------------
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -356,69 +356,139 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  final _fullName = TextEditingController();
-  final _email = TextEditingController();
-  final _phone = TextEditingController();
-  final _password = TextEditingController();
+  final _fullName        = TextEditingController();
+  final _email           = TextEditingController();
+  final _phone           = TextEditingController();
+  final _password        = TextEditingController();
   final _confirmPassword = TextEditingController();
-  bool _hidePassword = true;
-  bool _hideConfirm = true;
-  bool _busy = false;
+
+  bool    _hidePassword = true;
+  bool    _hideConfirm  = true;
+  bool    _busy         = false;
   String? _error;
-  List<Map<String, dynamic>> _puroks = [];
+
+  // All locations returned by /puroks (active only)
   List<Map<String, dynamic>> _locations = [];
+  // Puroks filtered to the selected location (or all if none selected)
+  List<Map<String, dynamic>> _filteredPuroks = [];
+
   String? _selectedPurokId;
   String? _selectedLocationId;
-  bool _puroksLoading = false;
-  bool _puroksLoadFailed = false;
+
+  bool _locationsLoading  = false;
+  bool _puroksLoading     = false;
+  bool _loadFailed        = false;
+
+  // Password strength: 0 = none, 1 = weak, 2 = medium, 3 = strong
+  int _pwStrength = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadPuroks();
+    _password.addListener(_updatePasswordStrength);
+    _loadLocations();
   }
 
-  Future<void> _loadPuroks() async {
-    setState(() { _puroksLoading = true; _puroksLoadFailed = false; });
+  // --- Helpers --------------------------------------------------------------
+
+  void _updatePasswordStrength() {
+    final pw = _password.text;
+    if (pw.isEmpty) { setState(() => _pwStrength = 0); return; }
+    int score = 0;
+    if (pw.length >= 8)                                        score++;
+    if (RegExp(r'[A-Z]').hasMatch(pw))                         score++;
+    if (RegExp(r'[0-9]').hasMatch(pw))                         score++;
+    if (RegExp(r"""[@$!%*#?&^()_\-+=\[\]{};:'",.<>\/|`~]""").hasMatch(pw)) score++;
+    int strength;
+    if (pw.length < 8 || score < 2)      strength = 1; // weak
+    else if (pw.length >= 8 && score < 4) strength = 2; // medium
+    else                                  strength = 3; // strong
+    if (mounted) setState(() => _pwStrength = strength);
+  }
+
+  /// Load active locations from /puroks. Called once on init.
+  Future<void> _loadLocations() async {
+    setState(() { _locationsLoading = true; _loadFailed = false; });
     try {
       final response = await Api.req('GET', '/puroks', auth: false);
-      final purokList = (response['puroks'] as List).cast<Map<String, dynamic>>();
       final locationList = (response['locations'] as List? ?? []).cast<Map<String, dynamic>>();
       if (mounted) {
         setState(() {
-          _puroks = purokList;
-          _locations = locationList;
-          _puroksLoading = false;
+          _locations       = locationList;
+          _locationsLoading = false;
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() { _puroksLoading = false; _puroksLoadFailed = true; });
-      }
+      if (mounted) setState(() { _locationsLoading = false; _loadFailed = true; });
     }
   }
+
+  /// Called whenever the selected location changes.
+  /// Re-fetches puroks filtered by that location.
+  Future<void> _onLocationChanged(String? locationId) async {
+    setState(() {
+      _selectedLocationId = locationId;
+      _selectedPurokId    = null;       // reset purok selection
+      _filteredPuroks     = [];
+      _puroksLoading      = locationId != null;
+    });
+    if (locationId == null) return;
+
+    try {
+      final response = await Api.req(
+        'GET', '/puroks?location_id=$locationId', auth: false,
+      );
+      final purokList = (response['puroks'] as List).cast<Map<String, dynamic>>();
+      if (mounted) {
+        setState(() {
+          _filteredPuroks = purokList;
+          _puroksLoading  = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _puroksLoading = false; _loadFailed = true; });
+    }
+  }
+
+  bool get _allPuroksOccupied =>
+      _filteredPuroks.isNotEmpty &&
+      _filteredPuroks.every((p) => p['is_occupied'] == true);
+
+  // --- Validation + submit -------------------------------------------------
 
   Future<void> _register() async {
     if (_fullName.text.trim().isEmpty || _email.text.trim().isEmpty) {
       setState(() => _error = 'Please fill in all required fields.');
       return;
     }
-    // Phone validation
     final phone = _phone.text.trim();
     if (phone.isNotEmpty && !RegExp(r'^09\d{9}$').hasMatch(phone)) {
       setState(() => _error = 'Phone number must start with 09 and be 11 digits.');
-      return;
-    }
-    if (_selectedPurokId == null) {
-      setState(() => _error = 'Please select a purok.');
       return;
     }
     if (_selectedLocationId == null) {
       setState(() => _error = 'Please select a location.');
       return;
     }
+    if (_selectedPurokId == null) {
+      setState(() => _error = 'Please select a purok.');
+      return;
+    }
+    // Client-side: reject if selected purok is occupied (server also validates)
+    final selectedPurok = _filteredPuroks.firstWhere(
+      (p) => p['id'].toString() == _selectedPurokId,
+      orElse: () => <String, dynamic>{},
+    );
+    if (selectedPurok['is_occupied'] == true) {
+      setState(() => _error = 'This purok is already assigned. Please choose a different one.');
+      return;
+    }
     if (_password.text.length < 8) {
       setState(() => _error = 'Password must be at least 8 characters.');
+      return;
+    }
+    if (_pwStrength < 2) {
+      setState(() => _error = 'Password is too weak. Add uppercase letters, numbers, and special characters.');
       return;
     }
     if (_password.text != _confirmPassword.text) {
@@ -428,12 +498,12 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() { _busy = true; _error = null; });
     try {
       await Api.req('POST', '/register', auth: false, body: {
-        'name': _fullName.text.trim(),
-        'email': _email.text.trim(),
-        'phone': phone.isEmpty ? null : phone,
-        'purok_id': int.parse(_selectedPurokId!),
-        'location_id': int.parse(_selectedLocationId!),
-        'password': _password.text,
+        'name':                  _fullName.text.trim(),
+        'email':                 _email.text.trim(),
+        'phone':                 phone.isEmpty ? null : phone,
+        'purok_id':              int.parse(_selectedPurokId!),
+        'location_id':           int.parse(_selectedLocationId!),
+        'password':              _password.text,
         'password_confirmation': _confirmPassword.text,
       });
       if (mounted) {
@@ -451,10 +521,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
+    _password.removeListener(_updatePasswordStrength);
     _fullName.dispose(); _email.dispose(); _phone.dispose();
     _password.dispose(); _confirmPassword.dispose();
     super.dispose();
   }
+
+  // --- Build ----------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -481,6 +554,8 @@ class _RegisterPageState extends State<RegisterPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+
+                            // -- Personal info ----------------------------
                             const _FieldLabel('Full name'),
                             const SizedBox(height: 6),
                             TextField(controller: _fullName),
@@ -497,46 +572,31 @@ class _RegisterPageState extends State<RegisterPage> {
                               maxLength: 11,
                               decoration: const InputDecoration(counterText: ''),
                             ),
+
+                            // -- Location dropdown ------------------------
                             const SizedBox(height: 14),
                             const _FieldLabel('Location / Barangay'),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Only locations currently accepting staff applications are shown.',
+                              style: TextStyle(fontSize: 11, color: muted),
+                            ),
                             const SizedBox(height: 6),
-                            if (_puroksLoading)
+                            if (_locationsLoading)
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 12),
-                                child: Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                                child: Center(child: SizedBox(height: 20, width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2))),
                               )
-                            else if (_puroksLoadFailed)
-                              const SizedBox.shrink()
-                            else
-                              DropdownButtonFormField<String>(
-                                initialValue: _selectedLocationId,
-                                hint: const Text('Select Location'),
-                                items: _locations.map((l) => DropdownMenuItem<String>(
-                                  value: l['id'].toString(),
-                                  child: Text(l['name'].toString()),
-                                )).toList(),
-                                onChanged: (v) => setState(() => _selectedLocationId = v),
-                                decoration: const InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                                ),
-                              ),
-                            const SizedBox(height: 14),
-                            const _FieldLabel('Assigned Purok'),
-                            const SizedBox(height: 6),
-                            if (_puroksLoading)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                child: Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))),
-                              )
-                            else if (_puroksLoadFailed)
+                            else if (_loadFailed)
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Text('Could not load puroks. Check your connection.',
+                                  const Text('Could not load data. Check your connection.',
                                       style: TextStyle(color: Colors.red, fontSize: 13)),
                                   const SizedBox(height: 6),
                                   TextButton.icon(
-                                    onPressed: _loadPuroks,
+                                    onPressed: _loadLocations,
                                     icon: const Icon(Icons.refresh, size: 16),
                                     label: const Text('Retry'),
                                     style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
@@ -545,24 +605,89 @@ class _RegisterPageState extends State<RegisterPage> {
                               )
                             else
                               DropdownButtonFormField<String>(
-                                initialValue: _selectedPurokId,
-                                hint: const Text('Select Purok'),
-                                items: _puroks.map((p) => DropdownMenuItem<String>(
-                                  value: p['id'].toString(),
-                                  child: Text(p['name'].toString()),
+                                value: _selectedLocationId,
+                                hint: const Text('Select Location'),
+                                items: _locations.map((l) => DropdownMenuItem<String>(
+                                  value: l['id'].toString(),
+                                  child: Text(l['name'].toString()),
                                 )).toList(),
+                                onChanged: _onLocationChanged,
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                ),
+                              ),
+
+                            // -- Purok dropdown (filtered by location) ----
+                            const SizedBox(height: 14),
+                            const _FieldLabel('Assigned Purok'),
+                            const SizedBox(height: 6),
+                            if (_puroksLoading)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Center(child: SizedBox(height: 20, width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2))),
+                              )
+                            else if (_selectedLocationId == null)
+                              const Text(
+                                'Select a location first to see available puroks.',
+                                style: TextStyle(color: muted, fontSize: 13),
+                              )
+                            else if (_allPuroksOccupied)
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xfffff7ed),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xfffed7aa)),
+                                ),
+                                child: const Text(
+                                  'All puroks currently have assigned staff. Contact the administrator.',
+                                  style: TextStyle(fontSize: 13, color: Color(0xff92400e)),
+                                ),
+                              )
+                            else
+                              DropdownButtonFormField<String>(
+                                value: _selectedPurokId,
+                                hint: const Text('Select Purok'),
+                                items: _filteredPuroks.map((p) {
+                                  final isOccupied = p['is_occupied'] == true;
+                                  return DropdownMenuItem<String>(
+                                    value: p['id'].toString(),
+                                    enabled: !isOccupied,
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            p['name'].toString(),
+                                            style: TextStyle(
+                                              color: isOccupied ? const Color(0xffb0bec5) : ink,
+                                            ),
+                                          ),
+                                        ),
+                                        if (isOccupied)
+                                          const Text(
+                                            'Already assigned',
+                                            style: TextStyle(fontSize: 11, color: Color(0xffb0bec5)),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
                                 onChanged: (v) => setState(() => _selectedPurokId = v),
                                 decoration: const InputDecoration(
                                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                                 ),
                               ),
+
+                            // -- Password ---------------------------------
                             const SizedBox(height: 14),
-                            const _FieldLabel('Password (min 8 characters)'),
+                            const _FieldLabel('Password'),
                             const SizedBox(height: 6),
                             TextField(
                               controller: _password,
                               obscureText: _hidePassword,
                               decoration: InputDecoration(
+                                hintText: 'Min 8 chars, uppercase, number, special',
                                 suffixIcon: IconButton(
                                   onPressed: () => setState(() => _hidePassword = !_hidePassword),
                                   icon: Icon(_hidePassword
@@ -571,6 +696,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                 ),
                               ),
                             ),
+                            // Password strength bar
+                            if (_pwStrength > 0) ...[
+                              const SizedBox(height: 8),
+                              _PasswordStrengthBar(strength: _pwStrength),
+                            ],
                             const SizedBox(height: 14),
                             const _FieldLabel('Confirm password'),
                             const SizedBox(height: 6),
@@ -586,6 +716,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                 ),
                               ),
                             ),
+
+                            // -- Error + submit ---------------------------
                             if (_error != null) ...[
                               const SizedBox(height: 12),
                               Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
@@ -594,7 +726,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             FilledButton(
                               onPressed: _busy ? null : _register,
                               child: _busy
-                                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  ? const SizedBox(height: 20, width: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                   : const Text('Submit Request'),
                             ),
                             const SizedBox(height: 12),
@@ -604,7 +737,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                 const Text('Already have an account? ', style: TextStyle(color: muted, fontSize: 13)),
                                 GestureDetector(
                                   onTap: () => Navigator.pop(context),
-                                  child: const Text('Sign in', style: TextStyle(color: blue, fontWeight: FontWeight.w700, fontSize: 13)),
+                                  child: const Text('Sign in',
+                                      style: TextStyle(color: blue, fontWeight: FontWeight.w700, fontSize: 13)),
                                 ),
                               ],
                             ),
@@ -620,9 +754,6 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
       );
 }
-
-// ─── Forgot Password Page ────────────────────────────────────────────────────
-
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
   @override
@@ -711,7 +842,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       );
 }
 
-// ─── Verify OTP Page ─────────────────────────────────────────────────────────
+// --- Verify OTP Page ---------------------------------------------------------
 
 class VerifyOtpPage extends StatefulWidget {
   const VerifyOtpPage({super.key, required this.email});
@@ -832,7 +963,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
       );
 }
 
-// ─── Reset Password Page ─────────────────────────────────────────────────────
+// --- Reset Password Page -----------------------------------------------------
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key, required this.email});
@@ -950,7 +1081,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       );
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// --- Shared helpers -----------------------------------------------------------
 
 class _FieldLabel extends StatelessWidget {
   const _FieldLabel(this.text);
@@ -960,6 +1091,44 @@ class _FieldLabel extends StatelessWidget {
       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ink));
 }
 
+/// A simple three-segment bar showing password strength.
+/// strength: 1 = weak (red), 2 = medium (amber), 3 = strong (green)
+class _PasswordStrengthBar extends StatelessWidget {
+  const _PasswordStrengthBar({required this.strength});
+  final int strength;
+
+  @override
+  Widget build(BuildContext context) {
+    const colors = [
+      Colors.transparent,
+      Color(0xffdc2626), // weak  � red
+      Color(0xfff59e0b), // medium � amber
+      Color(0xff059669), // strong � green
+    ];
+    const labels = ['', 'Weak', 'Medium', 'Strong'];
+    final color = colors[strength.clamp(0, 3)];
+    final label = labels[strength.clamp(0, 3)];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: List.generate(3, (i) => Expanded(
+            child: Container(
+              margin: EdgeInsets.only(right: i < 2 ? 4 : 0),
+              height: 5,
+              decoration: BoxDecoration(
+                color: i < strength ? color : const Color(0xffe2e8f0),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          )),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+}
 class NavItem {
   final String title;
   final IconData icon;
@@ -967,7 +1136,7 @@ class NavItem {
   const NavItem(this.title, this.icon, this.page);
 }
 
-// ─── Staff Home ───────────────────────────────────────────────────────────────
+// --- Staff Home ---------------------------------------------------------------
 
 class StaffHome extends StatefulWidget {
   const StaffHome({super.key});
@@ -1227,7 +1396,7 @@ void _showInfo(BuildContext context, String title, String message) => showDialog
         content: Text(message),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))]));
 
-// ─── Staff Dashboard ──────────────────────────────────────────────────────────
+// --- Staff Dashboard ----------------------------------------------------------
 
 class StaffDashboard extends StatefulWidget {
   const StaffDashboard({super.key});
@@ -1475,7 +1644,7 @@ class _MiniRecord extends StatelessWidget {
   Widget build(BuildContext context) => ListTile(contentPadding: EdgeInsets.zero, leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: blue, size: 20)), title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text(subtitle.trim().isEmpty ? '\u2014' : subtitle, style: const TextStyle(fontSize: 11, color: muted), maxLines: 1, overflow: TextOverflow.ellipsis));
 }
 
-// ─── Scan Page (QR Tracking) ──────────────────────────────────────────────────
+// --- Scan Page (QR Tracking) --------------------------------------------------
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -1659,6 +1828,74 @@ class _ScanPageState extends State<ScanPage> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tracking record saved successfully.')));
         _resetForm();
       }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.statusCode == 409) {
+        final familyName = e.data['family_name']?.toString() ?? 'This family';
+        final claimedAt  = e.data['claimed_at']?.toString() ?? 'an earlier time';
+        final claimedBy  = e.data['claimed_by']?.toString() ?? 'unknown';
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(children: [
+              const Icon(Icons.warning_amber_rounded, color: Color(0xffdc2626), size: 24),
+              const SizedBox(width: 8),
+              const Text('Already Claimed', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xffdc2626))),
+            ]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$familyName has already received their relief goods.', style: const TextStyle(fontSize: 14)),
+                const SizedBox(height: 10),
+                _ScanInfoRow(label: 'Claimed on', value: claimedAt),
+                _ScanInfoRow(label: 'Claimed by', value: claimedBy),
+              ],
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xffdc2626)),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        _resetForm();
+      } else if (e.statusCode == 403) {
+        final reason = e.data['exclusion_reason']?.toString() ?? 'No reason provided.';
+        await showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(children: [
+              const Icon(Icons.block_outlined, color: Color(0xfff59e0b), size: 24),
+              const SizedBox(width: 8),
+              const Text('Family Excluded', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xfff59e0b))),
+            ]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('This family has been excluded from the current distribution schedule.', style: TextStyle(fontSize: 14)),
+                const SizedBox(height: 10),
+                _ScanInfoRow(label: 'Reason', value: reason),
+              ],
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        _resetForm();
+      } else {
+        setState(() => _error = e.message);
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -1790,7 +2027,7 @@ class _ScanPageState extends State<ScanPage> {
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2)),
                           SizedBox(width: 10),
-                          Text('Loading members…',
+                          Text('Loading members�',
                               style: TextStyle(color: muted, fontSize: 13)),
                         ]),
                       )
@@ -1924,7 +2161,7 @@ class _ReadField extends StatelessWidget {
       );
 }
 
-// ─── Message Page (Chat Bubbles) ──────────────────────────────────────────────
+// --- Message Page (Chat Bubbles) ----------------------------------------------
 
 class MessagePage extends StatefulWidget {
   const MessagePage({super.key});
@@ -2188,7 +2425,7 @@ class _MessagePageState extends State<MessagePage> {
   }
 }
 
-// ─── Resource Page ────────────────────────────────────────────────────────────
+// --- Resource Page ------------------------------------------------------------
 
 class ResourcePage extends StatefulWidget {
   const ResourcePage({super.key});
@@ -2453,7 +2690,7 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-// ─── Distribution Page ────────────────────────────────────────────────────────
+// --- Distribution Page --------------------------------------------------------
 
 class DistributionPage extends StatefulWidget {
   const DistributionPage({super.key});
@@ -2465,6 +2702,7 @@ class _DistributionPageState extends State<DistributionPage> {
   List<Map<String, dynamic>> _distributions = [];
   List<Map<String, dynamic>> _schedules = [];
   Map<String, dynamic>? _selectedSchedule;
+  String _statusFilter = 'pending';
   String _search = '';
   bool _loading = true;
   String? _error;
@@ -2502,6 +2740,23 @@ class _DistributionPageState extends State<DistributionPage> {
                locName == _selectedSchedule!['location_name'];
       }).toList();
     }
+    // Status/exclusion filter
+    switch (_statusFilter) {
+      case 'pending':
+        list = list.where((d) =>
+          (d['status']?.toString() ?? '') == 'pending' &&
+          (d['excluded'] as bool? ?? false) == false
+        ).toList();
+        break;
+      case 'completed':
+        list = list.where((d) => (d['status']?.toString() ?? '') == 'completed').toList();
+        break;
+      case 'excluded':
+        list = list.where((d) => (d['excluded'] as bool? ?? false) == true).toList();
+        break;
+      default: // 'all'
+        break;
+    }
     if (_search.isEmpty) return list;
     return list.where((d) {
       final hay = '${d['family']?['family_name'] ?? d['family_name'] ?? ''} ${d['family_id'] ?? ''} ${d['status'] ?? ''}'.toLowerCase();
@@ -2509,9 +2764,32 @@ class _DistributionPageState extends State<DistributionPage> {
     }).toList();
   }
 
-  int _countStatus(String status) => _filtered
-      .where((d) => (d['status']?.toString() ?? '') == status)
-      .length;
+  int _countFiltered(String filter) {
+    var list = _distributions;
+    if (_selectedSchedule != null) {
+      list = list.where((d) {
+        final date        = d['distribution_date']?.toString().substring(0, 10);
+        final resourceName = d['resource']?['name']?.toString() ?? '';
+        final locationName = d['location']?['name']?.toString() ?? '';
+        return date == _selectedSchedule!['date'] &&
+               resourceName == _selectedSchedule!['resource_name'] &&
+               locationName == _selectedSchedule!['location_name'];
+      }).toList();
+    }
+    switch (filter) {
+      case 'pending':
+        return list.where((d) =>
+          (d['status']?.toString() ?? '') == 'pending' &&
+          (d['excluded'] as bool? ?? false) == false
+        ).length;
+      case 'completed':
+        return list.where((d) => (d['status']?.toString() ?? '') == 'completed').length;
+      case 'excluded':
+        return list.where((d) => (d['excluded'] as bool? ?? false) == true).length;
+      default:
+        return list.length;
+    }
+  }
 
   Color _statusColor(String? s) {
     final v = s?.toLowerCase() ?? '';
@@ -2573,6 +2851,10 @@ class _DistributionPageState extends State<DistributionPage> {
             _DetailRow('Qty', d['quantity']?.toString()),
             _DetailRow('Scanned By', d['distributor']?['name']?.toString() ?? d['scanned_by']?.toString()),
             _DetailRow('Status', d['status']?.toString()),
+            if (d['excluded'] as bool? ?? false)
+                _DetailRow('Excluded', 'Yes'),
+            if ((d['exclusion_reason']?.toString() ?? '').isNotEmpty)
+                _DetailRow('Exclusion Reason', d['exclusion_reason'].toString()),
             if (isCompleted)
               _DetailRow('Receiver', d['recipient_name']?.toString() ?? d['receiver']?.toString()),
             _DetailRow('Disaster', d['disaster']?.toString()),
@@ -2608,17 +2890,26 @@ class _DistributionPageState extends State<DistributionPage> {
               onChanged: (v) => setState(() => _selectedSchedule = v),
             ),
           ),
-        Padding(
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Row(
             children: [
-              _MiniStatChip('Families',  '${filtered.length}',               const Color(0xff2563eb)),
-              const SizedBox(width: 8),
-              _MiniStatChip('Pending',   '${_countStatus('pending')}',   const Color(0xfff59e0b)),
-              const SizedBox(width: 8),
-              _MiniStatChip('Completed', '${_countStatus('completed')}', const Color(0xff059669)),
-              const SizedBox(width: 8),
-              _MiniStatChip('Cancelled', '${_countStatus('cancelled')}', const Color(0xffdc2626)),
+              for (final tab in ['all', 'pending', 'completed', 'excluded']) ...[
+                _FilterTab(
+                  label: tab == 'all' ? 'All' :
+                         tab == 'pending' ? 'Pending' :
+                         tab == 'completed' ? 'Completed' : 'Excluded',
+                  count: _countFiltered(tab),
+                  isActive: _statusFilter == tab,
+                  color: tab == 'pending'   ? const Color(0xfff59e0b) :
+                         tab == 'completed' ? const Color(0xff059669) :
+                         tab == 'excluded'  ? const Color(0xffdc2626) :
+                                              const Color(0xff2563eb),
+                  onTap: () => setState(() => _statusFilter = tab),
+                ),
+                const SizedBox(width: 8),
+              ],
             ],
           ),
         ),
@@ -2702,6 +2993,28 @@ class _DistributionPageState extends State<DistributionPage> {
                                               child: Text(status, style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
                                             ),
                                           ),
+                                        if (d['excluded'] as bool? ?? false) ...[
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xffdc2626).withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: const Text('Excluded',
+                                                style: TextStyle(fontSize: 11, color: Color(0xffdc2626), fontWeight: FontWeight.w600)),
+                                          ),
+                                          if ((d['exclusion_reason']?.toString() ?? '').isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 2),
+                                              child: Text(
+                                                d['exclusion_reason'].toString(),
+                                                style: const TextStyle(fontSize: 11, color: muted),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                        ],
                                       ],
                                     ),
                                   ),
@@ -2721,7 +3034,74 @@ class _DistributionPageState extends State<DistributionPage> {
   }
 }
 
-// ─── Location Page ────────────────────────────────────────────────────────────
+// --- Distribution Filter Tab Widget ------------------------------------------
+
+class _FilterTab extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool isActive;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _FilterTab({
+    required this.label,
+    required this.count,
+    required this.isActive,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? color : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? color : const Color(0xffe2e8f0),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isActive ? Colors.white : const Color(0xff64748b),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? Colors.white.withValues(alpha: 0.3)
+                    : color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: isActive ? Colors.white : color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- Location Page ------------------------------------------------------------
 
 class LocationPage extends StatefulWidget {
   const LocationPage({super.key});
@@ -2884,7 +3264,7 @@ class _LocationPageState extends State<LocationPage> {
   }
 }
 
-// ─── Report Page ──────────────────────────────────────────────────────────────
+// --- Report Page --------------------------------------------------------------
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -3133,7 +3513,7 @@ class _ReportPageState extends State<ReportPage> {
   }
 }
 
-// ─── Family Register Sheet (staff manually registers a family) ───────────────
+// --- Family Register Sheet (staff manually registers a family) ---------------
 
 class _FamilyRegisterSheet extends StatefulWidget {
   final List<Map<String, dynamic>> puroks;
@@ -3415,7 +3795,7 @@ class _FamilyRegisterSheetState extends State<_FamilyRegisterSheet> {
       );
 }
 
-// ─── Family Detail Sheet ──────────────────────────────────────────────────────
+// --- Family Detail Sheet ------------------------------------------------------
 
 class _FamilyDetailSheet extends StatefulWidget {
   final Map<String, dynamic> family;
@@ -3515,7 +3895,7 @@ class _FamilyDetailSheetState extends State<_FamilyDetailSheet> {
   }
 }
 
-// ─── Family List Page ─────────────────────────────────────────────────────────
+// --- Family List Page ---------------------------------------------------------
 
 class FamilyListPage extends StatefulWidget {
   const FamilyListPage({super.key});
@@ -3681,7 +4061,7 @@ class _FamilyListPageState extends State<FamilyListPage> {
   }
 }
 
-// ─── Profile Page ─────────────────────────────────────────────────────────────
+// --- Profile Page -------------------------------------------------------------
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -3893,7 +4273,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-// ─── Scan History Page (uses _ApiListPage — kept intact) ─────────────────────
+// --- Scan History Page (uses _ApiListPage � kept intact) ---------------------
 
 class ScanHistoryPage extends StatelessWidget {
   const ScanHistoryPage({super.key});
@@ -3907,7 +4287,7 @@ class ScanHistoryPage extends StatelessWidget {
       );
 }
 
-// ─── _ApiListPage (kept intact for ScanHistoryPage) ──────────────────────────
+// --- _ApiListPage (kept intact for ScanHistoryPage) --------------------------
 
 class _ApiListPage extends StatefulWidget {
   const _ApiListPage({
@@ -4295,25 +4675,34 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _MiniStatChip extends StatelessWidget {
-  const _MiniStatChip(this.label, this.value, this.color);
-  final String label, value;
-  final Color color;
+// ─── Scan dialog helper ─────────────────────────────────────────────────────
+
+class _ScanInfoRow extends StatelessWidget {
+  const _ScanInfoRow({required this.label, required this.value});
+  final String label;
+  final String? value;
+
   @override
-  Widget build(BuildContext context) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
+  Widget build(BuildContext context) {
+    if (value == null || value!.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
-          Text(label, style: const TextStyle(fontSize: 10, color: muted)),
+          SizedBox(
+            width: 110,
+            child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xff64748b))),
+          ),
+          Expanded(
+            child: Text(
+              value!,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xff1e293b)),
+            ),
+          ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
+

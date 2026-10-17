@@ -1,6 +1,24 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Thrown when the server returns a non-2xx response.
+/// Carries the HTTP [statusCode] and the parsed [data] body so callers
+/// can react differently to 409 / 403 vs. generic errors.
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+  final Map<String, dynamic> data;
+
+  const ApiException({
+    required this.statusCode,
+    required this.message,
+    required this.data,
+  });
+
+  @override
+  String toString() => message;
+}
 
 class Api {
   static const baseUrl = String.fromEnvironment('API_BASE_URL',
@@ -56,7 +74,11 @@ class Api {
         : await http.get(uri, headers: headers);
     final data = _decodeBody(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(_extractMessage(data, response.statusCode));
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: _extractMessage(data, response.statusCode),
+        data: data,
+      );
     }
     return data;
   }
@@ -74,7 +96,11 @@ class Api {
         await http.patch(uri, headers: headers, body: jsonEncode(body ?? {}));
     final data = _decodeBody(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(_extractMessage(data, response.statusCode));
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: _extractMessage(data, response.statusCode),
+        data: data,
+      );
     }
     return data;
   }
@@ -91,7 +117,11 @@ class Api {
     final response = await http.Response.fromStream(streamed);
     final data = _decodeBody(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(_extractMessage(data, response.statusCode));
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: _extractMessage(data, response.statusCode),
+        data: data,
+      );
     }
     return data;
   }

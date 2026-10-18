@@ -22,7 +22,7 @@ class ApiException implements Exception {
 
 class Api {
   static const baseUrl = String.fromEnvironment('API_BASE_URL',
-      defaultValue: 'https://ambitious-flaring-jelly.ngrok-free.dev/api');
+      defaultValue: 'http://10.0.2.2:8000/api');
 
   static Future<String?> get token async =>
       (await SharedPreferences.getInstance()).getString('staff_token');

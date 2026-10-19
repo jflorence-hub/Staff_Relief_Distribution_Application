@@ -209,10 +209,7 @@ class _DistributionPageState extends State<DistributionPage> {
                 resource['name']?.toString() ?? d['resource_name']?.toString()),
             _DetailRow('Additional Items', d['additional_items']?.toString()),
             _DetailRow('Qty', d['quantity']?.toString()),
-            _DetailRow(
-                'Scanned By',
-                d['distributor']?['name']?.toString() ??
-                    d['scanned_by']?.toString()),
+            _DetailRow('Scanned By', d['scanned_by']?.toString()),
             _DetailRow('Status', d['status']?.toString()),
             if (d['excluded'] as bool? ?? false) _DetailRow('Excluded', 'Yes'),
             if ((d['exclusion_reason']?.toString() ?? '').isNotEmpty)
@@ -243,7 +240,7 @@ class _DistributionPageState extends State<DistributionPage> {
             child: DropdownButtonFormField<Map<String, dynamic>?>(
               initialValue: _selectedSchedule,
               decoration: const InputDecoration(
-                  labelText: 'Distribution Schedule',
+                  labelText: 'Schedule',
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
               items: [
@@ -252,8 +249,9 @@ class _DistributionPageState extends State<DistributionPage> {
                 ..._schedules.map((s) => DropdownMenuItem(
                       value: s,
                       child: Text(
-                        '${s['date'] ?? ''} \u2022 ${s['resource_name'] ?? ''} \u2022 ${s['location_name'] ?? ''}',
-                        overflow: TextOverflow.ellipsis,
+                        '${s['date'] ?? ''} \u2022 ${s['resource_name'] ?? ''}',
+                        maxLines: 2,
+                        softWrap: true,
                       ),
                     )),
               ],
@@ -448,8 +446,6 @@ class _DistributionPageState extends State<DistributionPage> {
                                                     .toString(),
                                                 style: const TextStyle(
                                                     fontSize: 11, color: muted),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                         ],

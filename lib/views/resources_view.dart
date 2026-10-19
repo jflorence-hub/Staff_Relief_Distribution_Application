@@ -22,7 +22,10 @@ class _ResourcePageState extends State<ResourcePage> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         Api.req('GET', '/resources'),
@@ -38,19 +41,30 @@ class _ResourcePageState extends State<ResourcePage> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+          _loading = false;
+        });
     }
   }
 
   List<Map<String, dynamic>> get _filtered {
     final myLocId = _meUser?['location_id']?.toString();
     return _resources.where((r) {
-      final locId = r['location_id']?.toString() ?? r['location']?['id']?.toString();
-      if (myLocId != null && myLocId.isNotEmpty && locId != null && locId != myLocId) return false;
-      if (_selectedCategory != null && r['category']?.toString() != _selectedCategory) return false;
-      if (_selectedDisaster != null && r['disaster']?.toString() != _selectedDisaster) return false;
+      final locId =
+          r['location_id']?.toString() ?? r['location']?['id']?.toString();
+      if (myLocId != null &&
+          myLocId.isNotEmpty &&
+          locId != null &&
+          locId != myLocId) return false;
+      if (_selectedCategory != null &&
+          r['category']?.toString() != _selectedCategory) return false;
+      if (_selectedDisaster != null &&
+          r['disaster']?.toString() != _selectedDisaster) return false;
       if (_search.isNotEmpty) {
-        final hay = '${r['name']} ${r['category']} ${r['location']?['name']}'.toLowerCase();
+        final hay = '${r['name']} ${r['category']} ${r['location']?['name']}'
+            .toLowerCase();
         if (!hay.contains(_search.toLowerCase())) return false;
       }
       return true;
@@ -58,30 +72,60 @@ class _ResourcePageState extends State<ResourcePage> {
   }
 
   List<String> get _categories {
-    final cats = _resources.map((r) => r['category']?.toString() ?? '').where((c) => c.isNotEmpty).toSet().toList();
+    final cats = _resources
+        .map((r) => r['category']?.toString() ?? '')
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList();
     cats.sort();
     return cats;
   }
 
   List<String> get _disasters {
-    final d = _resources.map((r) => r['disaster']?.toString() ?? '').where((c) => c.isNotEmpty).toSet().toList();
+    final d = _resources
+        .map((r) => r['disaster']?.toString() ?? '')
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList();
     d.sort();
     return d;
   }
 
+  String _disasterLabel(String disaster) {
+    switch (disaster) {
+      case 'Pandemic / Disease Outbreak':
+        return 'Disease outbreak';
+      case 'Industrial Accident':
+        return 'Industrial';
+      case 'Volcanic Eruption':
+        return 'Volcano';
+      case 'Oil Spill':
+        return 'Oil spill';
+      default:
+        return disaster;
+    }
+  }
+
   Color _statusColor(String? status) {
     final s = status?.toLowerCase() ?? '';
-    if (s.contains('available') || s.contains('in_stock') || s.contains('active')) return const Color(0xff059669);
-    if (s.contains('low') || s.contains('critical')) return const Color(0xffdc2626);
+    if (s.contains('available') ||
+        s.contains('in_stock') ||
+        s.contains('active')) return const Color(0xff059669);
+    if (s.contains('low') || s.contains('critical'))
+      return const Color(0xffdc2626);
     return muted;
   }
 
   String _formatResourceStatus(String? raw) {
     switch (raw?.toLowerCase()) {
-      case 'in_stock':      return 'In Stock';
-      case 'low_stock':     return 'Low Stock';
-      case 'out_of_stock':  return 'Out of Stock';
-      default:              return raw ?? '';
+      case 'in_stock':
+        return 'In Stock';
+      case 'low_stock':
+        return 'Low Stock';
+      case 'out_of_stock':
+        return 'Out of Stock';
+      default:
+        return raw ?? '';
     }
   }
 
@@ -89,7 +133,8 @@ class _ResourcePageState extends State<ResourcePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.6,
@@ -98,22 +143,34 @@ class _ResourcePageState extends State<ResourcePage> {
           controller: ctrl,
           padding: const EdgeInsets.all(20),
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xffe2e8f0), borderRadius: BorderRadius.circular(2)))),
+            Center(
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: const Color(0xffe2e8f0),
+                        borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
-            Text(r['name']?.toString() ?? 'Resource', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
+            Text(r['name']?.toString() ?? 'Resource',
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w800, color: ink)),
             const SizedBox(height: 12),
             _DetailRow('Category', r['category']?.toString()),
             _DetailRow('Quantity', '${r['quantity'] ?? ''} ${r['unit'] ?? ''}'),
-            _DetailRow('Status', _formatResourceStatus(r['status']?.toString())),
+            _DetailRow(
+                'Status', _formatResourceStatus(r['status']?.toString())),
             _DetailRow('Location', r['location']?['name']?.toString()),
             _DetailRow('Disaster', r['disaster']?.toString()),
             _DetailRow('Description', r['description']?.toString()),
             _DetailRow('Min Threshold', r['minimum_threshold']?.toString()),
             if ((r['qr_code']?.toString() ?? '').isNotEmpty) ...[
               const SizedBox(height: 8),
-              const Text('QR Code', style: TextStyle(fontSize: 12, color: muted)),
+              const Text('QR Code',
+                  style: TextStyle(fontSize: 12, color: muted)),
               const SizedBox(height: 4),
-              SelectableText(r['qr_code'].toString(), style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+              SelectableText(r['qr_code'].toString(),
+                  style:
+                      const TextStyle(fontFamily: 'monospace', fontSize: 13)),
             ],
           ],
         ),
@@ -132,7 +189,9 @@ class _ResourcePageState extends State<ResourcePage> {
             children: [
               TextField(
                 onChanged: (v) => setState(() => _search = v),
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search resources...'),
+                decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Search resources...'),
               ),
               const SizedBox(height: 10),
               Row(
@@ -140,10 +199,15 @@ class _ResourcePageState extends State<ResourcePage> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: _selectedCategory,
-                      decoration: const InputDecoration(labelText: 'Category', contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                      decoration: const InputDecoration(
+                          labelText: 'Category',
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8)),
                       items: [
                         const DropdownMenuItem(value: null, child: Text('All')),
-                        ..._categories.map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis))),
+                        ..._categories.map((c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(c, overflow: TextOverflow.ellipsis))),
                       ],
                       onChanged: (v) => setState(() => _selectedCategory = v),
                     ),
@@ -152,10 +216,14 @@ class _ResourcePageState extends State<ResourcePage> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: _selectedDisaster,
-                      decoration: const InputDecoration(labelText: 'Disaster', contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                      decoration: const InputDecoration(
+                          labelText: 'Disaster',
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8)),
                       items: [
                         const DropdownMenuItem(value: null, child: Text('All')),
-                        ..._disasters.map((d) => DropdownMenuItem(value: d, child: Text(d, overflow: TextOverflow.ellipsis))),
+                        ..._disasters.map((d) => DropdownMenuItem(
+                            value: d, child: Text(_disasterLabel(d)))),
                       ],
                       onChanged: (v) => setState(() => _selectedDisaster = v),
                     ),
@@ -165,13 +233,21 @@ class _ResourcePageState extends State<ResourcePage> {
             ],
           ),
         ),
-        if (_loading) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
-        if (_error != null) Padding(padding: const EdgeInsets.all(16), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        if (_loading)
+          const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator())),
+        if (_error != null)
+          Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(_error!, style: const TextStyle(color: Colors.red))),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
             child: filtered.isEmpty && !_loading
-                ? const Center(child: Text('No resources found.', style: TextStyle(color: muted)))
+                ? const Center(
+                    child: Text('No resources found.',
+                        style: TextStyle(color: muted)))
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: filtered.length,
@@ -189,45 +265,93 @@ class _ResourcePageState extends State<ResourcePage> {
                               child: Row(
                                 children: [
                                   Container(
-                                    width: 44, height: 44,
-                                    decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(13)),
-                                    child: const Icon(Icons.inventory_2_outlined, color: blue),
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                        color: const Color(0xffeff6ff),
+                                        borderRadius:
+                                            BorderRadius.circular(13)),
+                                    child: const Icon(
+                                        Icons.inventory_2_outlined,
+                                        color: blue),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text(r['name']?.toString() ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                                        Text(r['name']?.toString() ?? '',
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700)),
                                         const SizedBox(height: 4),
                                         Row(
                                           children: [
-                                            if ((r['category']?.toString() ?? '').isNotEmpty)
+                                            if ((r['category']?.toString() ??
+                                                    '')
+                                                .isNotEmpty)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                decoration: BoxDecoration(color: const Color(0xffeff6ff), borderRadius: BorderRadius.circular(8)),
-                                                child: Text(r['category'].toString(), style: const TextStyle(fontSize: 11, color: blue)),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 3),
+                                                decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xffeff6ff),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8)),
+                                                child: Text(
+                                                    r['category'].toString(),
+                                                    style: const TextStyle(
+                                                        fontSize: 11,
+                                                        color: blue)),
                                               ),
                                             const SizedBox(width: 6),
-                                            Text('${r['quantity'] ?? ''} ${r['unit'] ?? ''}', style: const TextStyle(fontSize: 12, color: muted)),
+                                            Text(
+                                                '${r['quantity'] ?? ''} ${r['unit'] ?? ''}',
+                                                style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: muted)),
                                           ],
                                         ),
                                         const SizedBox(height: 4),
-                                        if ((r['location']?['name']?.toString() ?? '').isNotEmpty)
-                                          Text(r['location']['name'].toString(), style: const TextStyle(fontSize: 11, color: muted)),
+                                        if ((r['location']?['name']
+                                                    ?.toString() ??
+                                                '')
+                                            .isNotEmpty)
+                                          Text(r['location']['name'].toString(),
+                                              style: const TextStyle(
+                                                  fontSize: 11, color: muted)),
                                         if (status.isNotEmpty)
                                           Padding(
-                                            padding: const EdgeInsets.only(top: 4),
+                                            padding:
+                                                const EdgeInsets.only(top: 4),
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                                              child: Text(_formatResourceStatus(status), style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 3),
+                                              decoration: BoxDecoration(
+                                                  color: statusColor.withValues(
+                                                      alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8)),
+                                              child: Text(
+                                                  _formatResourceStatus(status),
+                                                  style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: statusColor,
+                                                      fontWeight:
+                                                          FontWeight.w600)),
                                             ),
                                           ),
                                       ],
                                     ),
                                   ),
-                                  const Icon(Icons.chevron_right, color: Color(0xff94a3b8)),
+                                  const Icon(Icons.chevron_right,
+                                      color: Color(0xff94a3b8)),
                                 ],
                               ),
                             ),
@@ -255,8 +379,14 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 130, child: Text(label, style: const TextStyle(fontSize: 12, color: muted))),
-          Expanded(child: Text(value!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ink))),
+          SizedBox(
+              width: 130,
+              child: Text(label,
+                  style: const TextStyle(fontSize: 12, color: muted))),
+          Expanded(
+              child: Text(value!,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600, color: ink))),
         ],
       ),
     );
@@ -264,4 +394,3 @@ class _DetailRow extends StatelessWidget {
 }
 
 // --- Distribution Page --------------------------------------------------------
-

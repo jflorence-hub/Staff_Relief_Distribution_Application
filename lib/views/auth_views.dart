@@ -325,6 +325,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final _fullName = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
+  final _birthdate = TextEditingController();
+  final _homeAddress = TextEditingController();
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
 
@@ -345,6 +347,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _locationsLoading = false;
   bool _puroksLoading = false;
   bool _loadFailed = false;
+  DateTime? _selectedBirthdate;
 
   // Password strength: 0 = none, 1 = weak, 2 = medium, 3 = strong
   int _pwStrength = 0;
@@ -364,20 +367,31 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() => _pwStrength = 0);
       return;
     }
-    int score = 0;
-    if (pw.length >= 8) score++;
-    if (RegExp(r'[A-Z]').hasMatch(pw)) score++;
-    if (RegExp(r'[0-9]').hasMatch(pw)) score++;
-    if (RegExp(r"""[@$!%*#?&^()_\-+=\[\]{};:'",.<>\/|`~]""").hasMatch(pw))
-      score++;
-    int strength;
-    if (pw.length < 8 || score < 2)
-      strength = 1; // weak
-    else if (pw.length >= 8 && score < 4)
-      strength = 2; // medium
-    else
-      strength = 3; // strong
+    final strength = pw.length < 8
+        ? 1
+        : pw.length < 12
+            ? 2
+            : 3;
     if (mounted) setState(() => _pwStrength = strength);
+  }
+
+  DateTime get _latestEligibleBirthdate {
+    final today = DateTime.now();
+    return DateTime(today.year - 18, today.month, today.day);
+  }
+
+  Future<void> _pickBirthdate() async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _selectedBirthdate ?? _latestEligibleBirthdate,
+      firstDate: DateTime(1900),
+      lastDate: _latestEligibleBirthdate,
+    );
+    if (selected == null) return;
+    setState(() {
+      _selectedBirthdate = selected;
+      _birthdate.text = DateFormat('yyyy-MM-dd').format(selected);
+    });
   }
 
   /// Load active locations from /puroks. Called once on init.
@@ -457,14 +471,14 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() => _error = 'Please select a location.');
       return;
     }
+    if (_selectedBirthdate == null ||
+        _selectedBirthdate!.isAfter(_latestEligibleBirthdate)) {
+      setState(() => _error = 'Staff must be at least 18 years old.');
+      return;
+    }
     // purok is now optional — applicant expresses preferences, admin assigns at approval
     if (_password.text.length < 8) {
       setState(() => _error = 'Password must be at least 8 characters.');
-      return;
-    }
-    if (_pwStrength < 2) {
-      setState(() => _error =
-          'Password is too weak. Add uppercase letters, numbers, and special characters.');
       return;
     }
     if (_password.text != _confirmPassword.text) {
@@ -480,6 +494,9 @@ class _RegisterPageState extends State<RegisterPage> {
         'name': _fullName.text.trim(),
         'email': _email.text.trim(),
         'phone': phone.isEmpty ? null : phone,
+        'birthdate': _birthdate.text,
+        'home_address':
+            _homeAddress.text.trim().isEmpty ? null : _homeAddress.text.trim(),
         'purok_id': null, // assigned by admin at approval
         'preferred_purok_ids': _noPreference || _selectedPurokIds.isEmpty
             ? null
@@ -511,6 +528,8 @@ class _RegisterPageState extends State<RegisterPage> {
     _fullName.dispose();
     _email.dispose();
     _phone.dispose();
+    _birthdate.dispose();
+    _homeAddress.dispose();
     _password.dispose();
     _confirmPassword.dispose();
     super.dispose();
@@ -559,8 +578,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 controller: _email,
                                 keyboardType: TextInputType.emailAddress),
                             const SizedBox(height: 14),
-                            const _FieldLabel(
-                                'Phone (optional, must start with 09)'),
+                            const _FieldLabel('Phone (optional)'),
                             const SizedBox(height: 6),
                             TextField(
                               controller: _phone,
@@ -569,10 +587,30 @@ class _RegisterPageState extends State<RegisterPage> {
                               decoration:
                                   const InputDecoration(counterText: ''),
                             ),
+                            const SizedBox(height: 14),
+                            const _FieldLabel('Birth date (18+)'),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _birthdate,
+                              readOnly: true,
+                              onTap: _pickBirthdate,
+                              decoration: const InputDecoration(
+                                hintText: 'Select your date of birth',
+                                suffixIcon: Icon(Icons.calendar_today_outlined),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            const _FieldLabel('Home address'),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _homeAddress,
+                              maxLines: 2,
+                              textCapitalization: TextCapitalization.words,
+                            ),
 
                             // -- Location dropdown ------------------------
                             const SizedBox(height: 14),
-                            const _FieldLabel('Location / Barangay'),
+                            const _FieldLabel('Barangay'),
                             const SizedBox(height: 4),
                             const Text(
                               'Only locations currently accepting staff applications are shown.',
@@ -626,7 +664,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                             // -- Purok preference -----------------------
                             const SizedBox(height: 14),
-                            const _FieldLabel('Preferred Purok (optional)'),
+                            const _FieldLabel('Purok (optional)'),
                             const SizedBox(height: 4),
                             const Text(
                               'Choose one preferred purok. The admin will confirm your assignment.',
@@ -697,8 +735,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               controller: _password,
                               obscureText: _hidePassword,
                               decoration: InputDecoration(
-                                hintText:
-                                    'Min 8 chars, uppercase, number, special',
+                                hintText: 'At least 8 characters',
                                 suffixIcon: IconButton(
                                   onPressed: () => setState(
                                       () => _hidePassword = !_hidePassword),

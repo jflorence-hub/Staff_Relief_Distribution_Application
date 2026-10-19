@@ -73,7 +73,7 @@ class _ScanPageState extends State<ScanPage> {
     final value = raw.trim();
     if (value.isEmpty) return;
 
-    // Always fetch the current distribution so a member's latest claim is shown.
+    // Resolve the family QR to an active distribution scheduled for today.
     try {
       final result = await Api.req('POST', '/distributions/lookup-by-qr',
           body: {'qr_code': value});
@@ -96,6 +96,15 @@ class _ScanPageState extends State<ScanPage> {
           return;
         }
       }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.data['no_active_schedule'] == true
+            ? e.message
+            : 'No family found for QR code "$value".';
+        _formVisible = false;
+      });
+      return;
     } catch (_) {}
 
     // Not found
@@ -127,10 +136,18 @@ class _ScanPageState extends State<ScanPage> {
     final qty = dist['quantity'] != null ? dist['quantity'].toString() : '1';
     final distributionDate =
         DateTime.tryParse(dist['distribution_date']?.toString() ?? '');
-    final scheduleDisplay = distributionDate == null
-        ? 'Schedule time unavailable'
-        : DateFormat('MMM d, yyyy · hh:mm a')
-            .format(distributionDate.toLocal());
+    final schedule = dist['schedule'];
+    final disasterEvent = schedule is Map ? schedule['disaster_event'] : null;
+    final disasterEventName =
+        disasterEvent is Map ? disasterEvent['name']?.toString() : null;
+    final scheduleDisplay = [
+      if (disasterEventName != null && disasterEventName.isNotEmpty)
+        disasterEventName,
+      distributionDate == null
+          ? 'Schedule time unavailable'
+          : DateFormat('MMM d, yyyy · hh:mm a')
+              .format(distributionDate.toLocal()),
+    ].join(' · ');
 
     setState(() {
       _familyId = fam['id']?.toString();
@@ -401,8 +418,8 @@ class _ScanPageState extends State<ScanPage> {
                       Expanded(
                         child: TextField(
                           controller: _manualCodeCtrl,
-                          decoration: const InputDecoration(
-                              labelText: 'Family Distribution Code'),
+                          decoration:
+                              const InputDecoration(labelText: 'Relief code'),
                           onSubmitted: (v) {
                             final code = v.trim();
                             if (code.isNotEmpty) _onQrDecoded(code);
